@@ -1,0 +1,329 @@
+from omni.interfaces.util import invoke, encode_response
+import base64
+import hashlib
+import hmac
+import json
+import time
+from omni.interfaces.base.market_base import market_base
+from omni.interfaces.registration import register
+import requests
+import requests_cache
+
+API_VERSION = '/v1'
+BASE_URI = "https://api.sandbox.gemini.com" + API_VERSION
+
+
+def _order_count():
+    return 1
+
+def _get_next_order_id():
+    return 1
+
+def _get_nonce():
+    return time.time() * 1000
+
+
+def _invoke_api(endpoint, payload, params=None, pub=True, keys=None, encode=True):
+    """ Sends the request to the Gemini Exchange API.
+
+        Args:
+            endpoint (str):   URL the call will go to
+            payload (dict):   Headers containing the request specifics
+            params (dict, optional):    A dict containing URL parameters (for public API calls)
+            pub(bool, optional):    Boolean value identifying a Public API call (True) or Private API call (False)
+    """
+
+    public_session = requests_cache.CachedSession(cache_name="gemini_public", expire_after=30, backend='sqlite')
+    private_session = requests_cache.CachedSession(cache_name="gemini_private", expire_after=30,
+                                                        backend='sqlite')
+
+    url = BASE_URI + endpoint
+
+    load = payload
+
+    if pub == False:
+        if keys is None:
+            raise Exception
+
+        # base64 encode the payload
+        payload = str.encode(json.dumps(payload))
+        b64 = base64.b64encode(payload)
+
+        # sign the requests
+        signature = hmac.new(str.encode(keys['private']), b64, hashlib.sha384).hexdigest()
+
+        headers = {
+            'Content-Type': 'text/plain',
+            'X-GEMINI-APIKEY': keys['public'],
+            'X-GEMINI-PAYLOAD': b64,
+            'X-GEMINI-SIGNATURE': signature
+        }
+        return invoke("POST", url=url, headers=headers, payload=load, session=private_session, encode=encode)
+    else:
+        return invoke("GET", url=url, params=params, payload=load, session=public_session, encode=encode)
+
+
+
+
+# Public API methods
+# ------------------
+# State
+def get_symbols(input):
+    """ https://docs.gemini.com/rest-api/#symbols """
+    endpoint = '/symbols'
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce()
+    }
+
+    return _invoke_api(endpoint, payload, pub=True)
+
+
+def get_ticker(input):
+    """ https://docs.gemini.com/rest-api/#ticker """
+    endpoint = '/pubticker/' + input.symbol
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce()
+    }
+
+    return _invoke_api(endpoint, payload, pub=True)
+
+
+def get_order_book(input):
+    """ https://docs.gemini.com/rest-api/#current-order-book """
+    endpoint = '/book/' + input.symbol
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce()
+    }
+
+    return _invoke_api(endpoint, payload, pub=True)
+
+
+def get_trade_history(input):
+
+
+    params = {}
+    # params['since'] = since
+    # params['limit_trades'] = limit_trades
+    # params['include_breaks'] = include_breaks
+
+    endpoint = '/trades/' + input.symbol
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce()
+    }
+
+    return _invoke_api(endpoint, payload, params, pub=True)
+
+
+
+def get_current_auction(input):
+    """ https://docs.gemini.com/rest-api/#current-aucion """
+    endpoint = '/auction/' + input.symbol
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce()
+    }
+
+    return _invoke_api(endpoint, payload, pub=True)
+
+
+
+def get_auction_history(input):
+
+    params = {}
+    # params['since'] = since
+    # params['limit_auction_results'] = limit_auction_results
+    # params['include_indicative'] = include_indicative
+
+    endpoint = '/auction/' + input.symbol + '/history'
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce()
+    }
+
+    return _invoke_api(endpoint, payload, params, pub=True)
+
+
+
+# Order Status API
+# https://docs.gemini.com/rest-api/#order-status
+# ----------------------------------------------
+# State
+def get_active_orders(input):
+
+    endpoint = '/orders'
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce()
+    }
+
+    return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
+
+
+
+def get_order_status(input):
+
+    """ https://docs.gemini.com/rest-api/#order-status """
+    endpoint = '/order/status'
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce(),
+        'order_id': input.order_id
+    }
+
+    return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
+
+
+
+def get_trade_volume(input):
+
+    endpoint = '/tradevolume'
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce()
+    }
+
+    return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
+
+
+
+def get_past_trades(input):
+
+    endpoint = '/mytrades'
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'symbol': input.symbol,
+        'nonce': _get_nonce(),
+        'limit_trades': limit_trades,
+        'timestamp': timestamp
+    }
+
+    return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
+
+
+
+# Order Placement API
+# https://docs.gemini.com/rest-api/#new-order
+# -------------------------------------------
+
+def new_order(input):
+
+    client_order_id = str(_get_next_order_id())
+    price = input.args[0] * 1e5
+    amount = input.args[0] * 1000.00
+    endpoint = '/order/new'
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce(),
+        'client_order_id': client_order_id,
+        'symbol': input.symbol,
+        'amount': amount,
+        'price': price,
+        'side': input.side,
+        'type': 'exchange limit',
+        'options': [input.options]
+    }
+
+    response = _invoke_api(endpoint, payload, keys=input.key_set, pub=False, encode=False)
+    response = json.loads(response)
+    new_order_id = response[0]["order_id"]
+    register(entry_point='omni.interfaces.markets.gemini:get_order_status', key_set=input.key_set, order_id=new_order_id)
+    register(entry_point='omni.interfaces.markets.gemini:cancel_order', key_set=input.key_set, order_id=new_order_id)
+
+    return encode_response(response)
+
+def cancel_order(input):
+
+    endpoint = '/order/cancel'
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce(),
+        'order_id': input.order_id
+    }
+
+    return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
+
+def cancel_session_orders(input):
+    """ https://docs.gemini.com/rest-api/#cancel-all-session-orders """
+    endpoint = '/order/cancel/session'
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce()
+    }
+
+    return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
+
+def cancel_all_orders(input):
+    """ https://docs.gemini.com/rest-api/#cancel-all-active-orders """
+    endpoint = '/order/cancel/all'
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce()
+    }
+
+    return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
+
+# Fund Management API's
+# https://docs.gemini.com/rest-api/#get-available-balances
+# --------------------------------------------------------
+def get_balance(input):
+    """ https://docs.gemini.com/rest-api/#get-available-balances """
+
+    cached = True
+
+    endpoint = '/balances'
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce()
+    }
+
+    return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
+
+# Tasks
+# =====================================================================================================================>
+
+def profit_over_time(input):
+
+    endpoint = '/balances'
+
+    payload = {
+        'request': API_VERSION + endpoint,
+        'nonce': _get_nonce()
+    }
+
+    response = _invoke_api(endpoint, payload, keys=input.key_set, pub=False, encode=False)
+    response = json.loads(response)
+    for balance in response:
+       if balance["currency"] == input.currency:
+            balance_value = 0
+
+            if balance["currency"] == "BTC":
+                balance_value =  market_base.calc_value("btc", balance["available"])
+
+            elif balance["currency"] == "ETH":
+                balance_value = market_base.calc_value("eth", balance["available"])
+
+            elif balance["currency"] == "USD":
+                balance_value = balance["available"]
+
+            id = balance["currency"] + balance["type"] + input.key_set["public"]
+            return market_base.profit_over_time(id, balance_value)
+
