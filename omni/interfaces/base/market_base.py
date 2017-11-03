@@ -2,10 +2,10 @@ import json
 import requests_cache
 import requests
 import time
-from omni.interfaces.util import invoke
+from omni.interfaces.invoke import invoke
 
 
-
+# todo implement store instead as well as alternative sources of crypto information
 
 class MarketBase(object):
     def __init__(self):

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="VcsDirectoryMappings">
+    <mapping directory="$PROJECT_DIR$/../analysis/VDCNN" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/../analysis/baselines" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../analysis/deep-text-classifier" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/../examples/gym-soccer" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/../omni" vcs="Git" />
   </component>

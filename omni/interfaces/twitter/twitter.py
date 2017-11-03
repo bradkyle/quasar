@@ -1,5 +1,5 @@
 from twitter import Twitter, OAuth, TwitterHTTPError, TwitterStream
-from omni.interfaces.util import encode_response
+from omni.interfaces.processing import process
 
 def search(input):
 
@@ -8,10 +8,12 @@ def search(input):
     access_token = input.key_set["access_token"]
     access_secret = input.key_set["access_secret"]
 
+    count = input.args[0] * 50
+
     oauth = OAuth(access_token, access_secret, consumer_key, consumer_secret)
 
     twitter = Twitter(auth=oauth)
 
-    tweets = twitter.search.tweets(q=input.term) #result_type='recent', lang='en', count=10
+    tweets = twitter.search.tweets(q=input.term, result_type='recent' , count=count)
 
-    return encode_response(tweets)
+    return process(tweets)

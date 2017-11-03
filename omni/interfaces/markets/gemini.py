@@ -1,23 +1,22 @@
-from omni.interfaces.util import invoke, encode_response
+from omni.interfaces.invoke import invoke
+from omni.interfaces.processing import process
 import base64
 import hashlib
 import hmac
 import json
 import time
 from omni.interfaces.base.market_base import market_base
-from omni.interfaces.registration import register
+from omni.interfaces.registration import affordance
 import requests
 import requests_cache
 
 API_VERSION = '/v1'
 BASE_URI = "https://api.sandbox.gemini.com" + API_VERSION
 
-
-def _order_count():
-    return 1
-
 def _get_next_order_id():
-    return 1
+    from omni.interfaces.store import current_gemini_order_id
+    current_gemini_order_id += 1
+    return current_gemini_order_id
 
 def _get_nonce():
     return time.time() * 1000
@@ -33,9 +32,9 @@ def _invoke_api(endpoint, payload, params=None, pub=True, keys=None, encode=True
             pub(bool, optional):    Boolean value identifying a Public API call (True) or Private API call (False)
     """
 
+
     public_session = requests_cache.CachedSession(cache_name="gemini_public", expire_after=30, backend='sqlite')
-    private_session = requests_cache.CachedSession(cache_name="gemini_private", expire_after=30,
-                                                        backend='sqlite')
+    private_session =requests_cache.CachedSession(cache_name="gemini_private", expire_after=30,backend='sqlite')
 
     url = BASE_URI + endpoint
 
@@ -58,10 +57,10 @@ def _invoke_api(endpoint, payload, params=None, pub=True, keys=None, encode=True
             'X-GEMINI-PAYLOAD': b64,
             'X-GEMINI-SIGNATURE': signature
         }
+
         return invoke("POST", url=url, headers=headers, payload=load, session=private_session, encode=encode)
     else:
         return invoke("GET", url=url, params=params, payload=load, session=public_session, encode=encode)
-
 
 
 
@@ -222,8 +221,8 @@ def get_past_trades(input):
 def new_order(input):
 
     client_order_id = str(_get_next_order_id())
-    price = input.args[0] * 1e5
-    amount = input.args[0] * 1000.00
+    price = round((input.args[0] * float(1e4)), 2) # todo make more dynamic
+    amount = round((input.args[1] * 1000.00), 2) # todo make more dynamic
     endpoint = '/order/new'
 
     payload = {
@@ -234,17 +233,27 @@ def new_order(input):
         'amount': amount,
         'price': price,
         'side': input.side,
-        'type': 'exchange limit',
-        'options': [input.options]
+        'type': 'exchange limit'
     }
 
-    response = _invoke_api(endpoint, payload, keys=input.key_set, pub=False, encode=False)
-    response = json.loads(response)
-    new_order_id = response[0]["order_id"]
-    register(entry_point='omni.interfaces.markets.gemini:get_order_status', key_set=input.key_set, order_id=new_order_id)
-    register(entry_point='omni.interfaces.markets.gemini:cancel_order', key_set=input.key_set, order_id=new_order_id)
+    if input.options != "" or None:
+        payload['options'] = [input.options]
 
-    return encode_response(response)
+    response = _invoke_api(endpoint, payload, keys=input.key_set, pub=False, encode=False)
+    if response is not None:
+        loaded_response = json.loads(response)
+
+        print("response:" + str(response))
+
+        if "result" not in loaded_response:
+            new_order_id = loaded_response[0]["order_id"]
+            affordance(entry_point='omni.interfaces.markets.gemini:get_order_status', key_set=input.key_set, order_id=new_order_id)
+            affordance(entry_point='omni.interfaces.markets.gemini:cancel_order', key_set=input.key_set, order_id=new_order_id)
+        # todo else
+
+        return process(response)
+    #todo else:
+
 
 def cancel_order(input):
 
@@ -285,9 +294,6 @@ def cancel_all_orders(input):
 # --------------------------------------------------------
 def get_balance(input):
     """ https://docs.gemini.com/rest-api/#get-available-balances """
-
-    cached = True
-
     endpoint = '/balances'
 
     payload = {

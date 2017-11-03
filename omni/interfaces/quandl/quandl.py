@@ -1,5 +1,4 @@
-import requests
-from omni.interfaces.util import encode_response, invoke
+from omni.interfaces.invoke import invoke
 
 def search(input):
 
@@ -15,4 +14,4 @@ def search(input):
     params = {}
     #column_index = 4 & exclude_column_names = true & rows = 3 & start_date = 2012 - 11 - 01 & end_date = 2013 - 11 - 30 & order = asc & collapse = quarterly & transform = rdiff
 
-    return invoke("GET", url="https://www.quandl.com/api/v3/datasets/"+str(input.term)+"/data.json", params=params)
+    return invoke("GET", url="https://www.quandl.com/api/v3/datasets/" + str(input.term)+"/data.json", params=params)

@@ -48,7 +48,6 @@ def test_runningmeanstd():
         (np.random.randn(3), np.random.randn(4), np.random.randn(5)),
         (np.random.randn(3,2), np.random.randn(4,2), np.random.randn(5,2)),
         ]:
-
         rms = RunningMeanStd(epsilon=0.0, shape=x1.shape[1:])
         U.initialize()
 

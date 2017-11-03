@@ -42,7 +42,6 @@ def undo_logger_setup():
     for logger in _extra_loggers:
         logger.setLevel(logging.NOTSET)
 
-LINE_LENGTH = 1024  # todo change
 PADDING_CHAR = " "
 CHAR_EMBEDDING = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{}\n"
 
@@ -52,12 +51,9 @@ def char_length():
 
 ACTION_HIGH = 100
 ACTION_LOW = -100
-
-
-DEFAULT_TIMEOUT = 120
-BAD_REQUEST_PENALTY = 30
-BAD_CONNECTION_PENALTY= 20
 MAX_PARAMS = 5
-SAVE_REQUEST = True
+SAVE_REQUEST = False
+MAX_SIMULTANEOUS_TASKS = 15
+MAX_LENGTH = 10400
 
 

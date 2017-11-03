@@ -2,7 +2,7 @@ import json
 import requests
 import requests_cache
 
-from omni.interfaces.util import invoke
+from omni.interfaces.invoke import invoke
 
 BASE_URL = 'https://api.coinmarketcap.com/v1/'
 

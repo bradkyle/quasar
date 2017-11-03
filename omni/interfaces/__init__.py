@@ -1,11 +1,28 @@
-from omni.interfaces.registration import register, task, closer
+from omni.interfaces.registration import affordance, task, closer
 import requests_cache
 
+# Cache
+# --------------------------------------------------------------------------------------------------------------------->
+
+
+# Store
+# --------------------------------------------------------------------------------------------------------------------->
+
+
+
+# Base
+# --------------------------------------------------------------------------------------------------------------------->
 
 task(entry_point='omni.interfaces.base.penalise:penalise_connection_errors')
 task(entry_point='omni.interfaces.base.penalise:penalise_connection_error')
 task(entry_point='omni.interfaces.base.penalise:penalise_response_size')
 task(entry_point='omni.interfaces.base.penalise:step_loss')
+
+affordance(entry_point="omni.interfaces.base.omni:list_affordances")
+affordance(entry_point="omni.interfaces.base.omni:list_tasks")
+
+# Blockchain.info
+# --------------------------------------------------------------------------------------------------------------------->
 
 for chart in ["total-bitcoins","market-price","market-cap","trade-volume",
                       "blocks-size", "avg-block-size", "n-orphaned-blocks", "n-transactions-per-block", "median-confirmation-time",
@@ -14,25 +31,30 @@ for chart in ["total-bitcoins","market-price","market-cap","trade-volume",
                       "n-transactions", "n-transactions-total", "transactions-per-second", "mempool-count", "mempool-growth", "mempool-size",
                       "utxo-count", "n-transactions-excluding-chains-longer-than-100", "output-volume", "estimated-transaction-volume",
                       "estimated-transaction-volume-usd", "my-wallet-n-users"]:
-    register(entry_point='omni.interfaces.web.blockchain:get_chart', chart=chart, cached=True, cache_length=84000)
+    affordance(entry_point='omni.interfaces.web.blockchain:get_chart', chart=chart, cached=True, cache_length=84000)
 
-register(entry_point='omni.interfaces.web.blockchain:get_ticker')
+affordance(entry_point='omni.interfaces.web.blockchain:get_ticker')
 
-register(entry_point='omni.interfaces.web.blockchain:get_stats')
+affordance(entry_point='omni.interfaces.web.blockchain:get_stats')
 
-register(entry_point='omni.interfaces.web.blockchain:get_pools')
+affordance(entry_point='omni.interfaces.web.blockchain:get_pools')
 
-register(entry_point='omni.interfaces.markets.gemini:get_symbols')
+
+# Gemini
+# --------------------------------------------------------------------------------------------------------------------->
+
+#task(entry_point='omni.interfaces.markets.gemini:step_loss')
+affordance(entry_point='omni.interfaces.markets.gemini:get_symbols')
 
 for pair in ["btcusd", "ethusd", "ethbtc"]:
 
-    register(entry_point='omni.interfaces.markets.gemini:get_ticker', symbol=pair)
+    affordance(entry_point='omni.interfaces.markets.gemini:get_ticker', symbol=pair)
 
-    register(entry_point='omni.interfaces.markets.gemini:get_order_book', symbol=pair)
+    affordance(entry_point='omni.interfaces.markets.gemini:get_order_book', symbol=pair)
 
-    register(entry_point='omni.interfaces.markets.gemini:get_current_auction', symbol=pair)
+    affordance(entry_point='omni.interfaces.markets.gemini:get_current_auction', symbol=pair)
 
-    register(entry_point='omni.interfaces.markets.gemini:get_auction_history', symbol=pair)
+    affordance(entry_point='omni.interfaces.markets.gemini:get_auction_history', symbol=pair)
 
 for key_set in [
     {"private": "3go1mGK4QSJkpFMdxtadRM6e9NoM", "public": "FdAVXfnhsnGwiEOOlDJY"},  # smithmalcolm46@gmail.com
@@ -44,25 +66,28 @@ for key_set in [
 
     closer(entry_point='omni.interfaces.markets.gemini:cancel_all_orders', key_set=key_set)
 
-    register(entry_point='omni.interfaces.markets.gemini:get_active_orders', key_set=key_set)
+    affordance(entry_point='omni.interfaces.markets.gemini:get_active_orders', key_set=key_set)
 
-    register(entry_point='omni.interfaces.markets.gemini:get_order_status', key_set=key_set)
+    affordance(entry_point='omni.interfaces.markets.gemini:get_order_status', key_set=key_set)
 
-    register(entry_point='omni.interfaces.markets.gemini:cancel_session_orders', key_set=key_set)
+    affordance(entry_point='omni.interfaces.markets.gemini:cancel_session_orders', key_set=key_set)
 
-    register(entry_point='omni.interfaces.markets.gemini:cancel_all_orders', key_set=key_set)
+    affordance(entry_point='omni.interfaces.markets.gemini:cancel_all_orders', key_set=key_set)
 
-    register(entry_point='omni.interfaces.markets.gemini:get_balance', key_set=key_set)
+    affordance(entry_point='omni.interfaces.markets.gemini:get_balance', key_set=key_set)
 
     for pair in ["btcusd", "ethusd", "ethbtc"]:
 
-        register(entry_point='omni.interfaces.markets.gemini:get_trade_volume', symbol=pair, key_set=key_set)
+        affordance(entry_point='omni.interfaces.markets.gemini:get_trade_volume', symbol=pair, key_set=key_set)
 
-        register(entry_point='omni.interfaces.markets.gemini:get_past_trades', symbol=pair, key_set=key_set)
+        affordance(entry_point='omni.interfaces.markets.gemini:get_past_trades', symbol=pair, key_set=key_set)
 
         for option in ["maker-or-cancel", "immediate-or-cancel", "auction-only", ""]:
             for side in ["buy", "sell"]:
-                register(entry_point='omni.interfaces.markets.gemini:new_order', symbol=pair, key_set=key_set, options=option, side=side)
+                affordance(entry_point='omni.interfaces.markets.gemini:new_order', symbol=pair, key_set=key_set, options=option, side=side)
+
+# Twitter
+# --------------------------------------------------------------------------------------------------------------------->
 
 for key_set in [
         {"consumer_key":"WM1MVD31TRGZBiNbXO54p4Sni", "consumer_secret":"SJzN8rhCSyyzxt55shwpPScX1aEdOWX63q8d8yKC9gNAESsCjO", "access_token":"367687040-UzRMSNmwLjgjDl3CwAS72UbyeSkDOmKTKzmWSK89", "access_secret":"TAAu1ScD4pscR8nHTp3UyXx2T6JyCqOy5vTmcIYMtuGga"},
@@ -77,30 +102,34 @@ for key_set in [
         {"consumer_key":"Zv9zY9KWONeU3qKbShxq9Oat9", "consumer_secret":"Uotuon99K26RCxtUkgB7KIBMjIKLaEQ8CFoCikCkqmDAstJCBX", "access_token":"860540303421448193-IgRs21k3HerMXA7eU97S90BZ3C460kF", "access_secret":"ab1WSco1X6jzmhNRNAnD1ieF7wmYGAKwK3ZbixwgyjuON"},
 ]:
     for term in ["bitcoin", "btc", "ether", "ethereum", "eth"]:
-        register(entry_point='omni.interfaces.twitter.twitter:search', key_set=key_set, term=term)
+        affordance(entry_point='omni.interfaces.twitter.twitter:search', key_set=key_set, term=term)
 
 
-# for key_set in [
-#     {"private": "3go1mGK4QSJkpFMdxtadRM6e9NoM", "public": "FdAVXfnhsnGwiEOOlDJY"},  # smithmalcolm46@gmail.com
-# ]:
+# Quora
+# --------------------------------------------------------------------------------------------------------------------->
 for term in ["FRED/GDP", "BNC3/GWA_BTC", "BNC3/GWA_LTC",
              "USTREASURY/REALLONGTERM", "USTREASURY/REALYIELD", "USTREASURY/BILLRATES", "USTREASURY/YIELD", "USTREASURY/LONGTERMRATES", "USTREASURY/HQMYC",
              "USTREASURY/MATDIS", "USTREASURY/AVMAT", "USTREASURY/TNMBOR", "USTREASURY/TMBOR", "USTREASURY/MKTDM", "USTREASURY/BRDNM"]:
-    register(entry_point='omni.interfaces.quandl.quandl:search', term=term)
+    affordance(entry_point='omni.interfaces.quandl.quandl:search', term=term)
 
-
+# Etherscan
+# --------------------------------------------------------------------------------------------------------------------->
 for chart in ["tx","address","etherprice","marketcap",
               "ethersupplygrowth", "hashrate", "difficulty", "pendingtx", "blocks",
               "uncles", "blocksize", "blocktime", "gasprice", "gaslimit", "gasused",
-              "ethersupply", "chaindatasizefull", "chaindatasizefast", "ens-register"]:
-    register(entry_point='omni.interfaces.web.etherscan:get_chart', chart=chart)
+              "ethersupply", "chaindatasizefull", "chaindatasizefast", "ens-affordance"]:
+    affordance(entry_point='omni.interfaces.web.etherscan:get_chart', chart=chart)
 
-
+# Coinmarketcap
+# --------------------------------------------------------------------------------------------------------------------->
 for convert in ["AUD", "BRL", "CAD", "CHF", "CNY", "EUR", "GBP", "HKD", "IDR", "INR", "JPY", "KRW", "MXN", "RUB"]:
-    register(entry_point='omni.interfaces.web.coinmarketcap:get_all_tickers', cache=True, cache_length=300, convert=convert)
+    affordance(entry_point='omni.interfaces.web.coinmarketcap:get_all_tickers', cache=True, cache_length=300, convert=convert)
 
 for convert in ["AUD", "BRL", "CAD", "CHF", "CLP", "CNY", "CZK", "DKK", "EUR", "GBP", "HKD", "HUF", "IDR", "ILS", "INR",
                 "JPY", "KRW", "MXN", "MYR", "NOK", "NZD", "PHP", "PKR", "PLN", "RUB", "SEK", "SGD", "THB", "TRY", "TWD", "ZAR"]:
-    register(entry_point='omni.interfaces.web.coinmarketcap:get_stats', convert=convert)
+    affordance(entry_point='omni.interfaces.web.coinmarketcap:get_stats', convert=convert)
+
+
+
 
 

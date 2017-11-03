@@ -62,6 +62,15 @@ class InvalidAction(Exception):
     """
     pass
 
+class NoEntryPointError(Exception):
+    """Raised when an entry point is not specified when required."""
+    pass
+
+class NoneResponseError(Exception):
+    """Raised when the response returned via the invocation of the entity is None"""
+    pass
+
+
 # API errors
 
 class APIError(Error):

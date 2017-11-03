@@ -1,6 +1,6 @@
 import requests_cache
 
-from omni.interfaces.util import invoke
+from omni.interfaces.invoke import invoke
 
 BASE_URI = "https://api.blockchain.info"
 
@@ -12,10 +12,10 @@ def get_chart(input):
 
     params = {}
 
-    # params['timespan'] =
-    # params['rollingAverage'] =
-    # params['start'] =
-    # params['include_breaks'] =
+    # params['rollingAverage'] = max_rolling_average * input.args[0]
+    # params['start'] = max_start * input.args[1]
+    # params['timespan'] = start -> max_timespan * input.args[2]
+    # params['include_breaks'] = input.args[3] > 0.5 : True else False
 
     url = "https://api.blockchain.info/charts/" + input.chart
     return invoke("GET", url, params=params, session=charts_session)
