@@ -41,9 +41,13 @@ class Instance(gym.Env):
         print("Cannot seed a live environment!")
 
     def _step(self, action):
-        affordance = affordance_registry.lookup(141) # int(action[0])
+        print(action)
+        affordance = affordance_registry.lookup(15) #
         self.observation= affordance(*action[1])
+        print("rewarding")
         self.reward = task_registry.aggregate()
+        print("rewarded")
+        print(self.reward)
         return self.observation, self.reward, self.done, self.info
 
     def spawn(self, index, k):

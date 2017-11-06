@@ -36,5 +36,5 @@ class TestInterfaces(unittest.TestCase):
         return NotImplemented
 
     def tearDown(self):
-        closer_registry.close()
-
+        #closer_registry.close()
+        return NotImplemented

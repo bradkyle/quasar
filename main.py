@@ -2,7 +2,7 @@ import os
 
 import time
 import baselines.common.tf_util as U
-from agent.run import Worker
+from tscl_agent.run import Worker
 import multiprocessing
 import threading
 import argparse
@@ -29,10 +29,12 @@ parser.add_argument('--clip-norm', type=float, default=None)
 parser.add_argument('--nb-epochs', type=int, default=500)  # with default settings, perform 1M steps total
 parser.add_argument('--nb-epoch-cycles', type=int, default=20)
 parser.add_argument('--nb-train-steps', type=int, default=50)  # per epoch cycle and MPI worker
-parser.add_argument('--nb-rollout-steps', type=int, default=100)  # per epoch cycle and MPI worker
+parser.add_argument('--nb-rollout-steps', type=int, default=1)  # per epoch cycle and MPI worker
 parser.add_argument('--noise-type', type=str, default='adaptive-param_0.2')  # choices are adaptive-param_xx, ou_xx, normal_xx, none
 boolean_flag(parser, 'evaluation', default=False)
 args = vars(parser.parse_args())
+
+# todo : working, training and evaluation should be done seperately
 
 if __name__ == '__main__':
 

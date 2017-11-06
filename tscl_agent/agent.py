@@ -1,14 +1,16 @@
 import tensorflow as tf
 from copy import copy
-
+from collections import deque
 import numpy as np
 from common.mpi_adam import MpiAdam
 from functools import reduce
 import common.tf_util as U
 import tensorflow.contrib as tc
 from common.mpi_running_mean_std import RunningMeanStd
-from agent.util import reduce_std, mpi_mean
+from tscl_agent.util import reduce_std, mpi_mean
 import common.logger as logger
+import numpy.random as rng
+from operator import sub
 
 def normalize(x, stats):
     if stats is None:
@@ -54,17 +56,16 @@ def get_perturbed_actor_updates(actor, perturbed_actor, param_noise_stddev):
 
 class Agent():
     def __init__(self,
+                 env,
                  shared,
                  index_actor,
                  index_critic,
                  param_actor,
                  param_critic,
                  memory,
-                 observation_shape,
                  rewards_shape,
                  candidates_shape,
                  param_action_shape,
-                 index_action_shape,
                  gamma=0.99,
                  tau=0.001,
                  normalize_observations=True,
@@ -86,11 +87,16 @@ class Agent():
                  index_critic_l2_reg=0.
                  ):
 
+        self.env = env
+
         # Placeholders
-        self.obs0 = tf.placeholder(tf.float32, shape=(None,) + observation_shape, name='obs0')
-        self.obs1 = tf.placeholder(tf.float32, shape=(None,) + observation_shape, name='obs1')
+        self.obs0 = tf.placeholder(tf.float32, shape=(None,) + self.env.observation_space.shape, name='obs0')
+        self.obs1 = tf.placeholder(tf.float32, shape=(None,) + self.env.observation_space.shape, name='obs1')
         self.terminals1 = tf.placeholder(tf.float32, shape=(None, 1), name='terminals1')
-        self.rewards = tf.placeholder(tf.float32, shape=(None,)+ rewards_shape, name='rewards')
+        self.step = tf.placeholder(tf.float32, shape=(None, 1), name='step')
+        self.reward = tf.placeholder(tf.float32, shape=(None, 1), name='reward')
+        self.reward0 = tf.placeholder(tf.float32, shape=(None,) + rewards_shape, name='reward0')
+        self.reward1 = tf.placeholder(tf.float32, shape=(None,) + rewards_shape, name='reward1')
         self.candidate_actions = tf.placeholder(tf.float32, shape=(None, candidates_shape), name='candidate_actions')
         self.param_actions = tf.placeholder(tf.float32, shape=(None,) + param_action_shape, name='actions')
         self.index_critic_target = tf.placeholder(tf.float32, shape=(None, 1), name='index_critic_target')
@@ -108,18 +114,15 @@ class Agent():
         self.action_range = action_range
         self.return_range = return_range
         self.observation_range = observation_range
-        self.reward_scale = reward_scale
-
+        self.rewards_scale = reward_scale
         self.index_critic = index_critic
         self.index_actor = index_actor
         self.index_actor_lr = index_actor_lr
         self.index_critic_lr = index_critic_lr
-
         self.param_critic = param_critic
         self.param_actor = param_actor
         self.param_actor_lr = param_actor_lr
         self.param_critic_lr = param_critic_lr
-
         self.clip_norm = clip_norm
         self.enable_popart = enable_popart
         self.batch_size = batch_size
@@ -127,13 +130,12 @@ class Agent():
         self.param_critic_l2_reg = param_critic_l2_reg
         self.index_critic_l2_reg = index_critic_l2_reg
 
-
         # Observation Normalization
         # ------------------------------------------------------------------------------------------------------------->
 
         if self.normalize_observations:
             with tf.variable_scope('obs_rms'):
-                self.obs_rms = RunningMeanStd(shape=observation_shape)
+                self.obs_rms = RunningMeanStd(shape=self.env.observation_space.shape)
         else:
             self.obs_rms = None
 
@@ -186,32 +188,35 @@ class Agent():
         # Index action path
         self.index_actor_tf = index_actor(self.shared_tf)
 
-        self.normalized_index_critic_tf = index_critic(self.shared_tf, self.candidate_actions)
+        self.normalized_index_critic_tf = index_critic(normalized_obs0, self.candidate_actions)
         self.index_critic_tf = denormalize(tf.clip_by_value(self.normalized_index_critic_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
 
         # Param action path
         self.param_actor_tf = param_actor(self.shared_tf)
 
-        self.normalized_param_critic_tf = param_critic(self.shared_tf, self.param_actions)
+        self.normalized_param_critic_tf = param_critic(normalized_obs0, self.param_actions)
         self.param_critic_tf = denormalize(tf.clip_by_value(self.normalized_param_critic_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
 
-        self.normalized_critic_with_actor_tf = param_critic(self.shared_tf, self.param_actor_tf, reuse=True)
+        self.normalized_critic_with_actor_tf = param_critic(normalized_obs0, self.param_actor_tf, reuse=True)
         self.param_critic_with_actor_tf = denormalize(tf.clip_by_value(self.normalized_critic_with_actor_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
 
 
         # Target Models
         # ------------------------------------------------------------------------------------------------------------->
 
+        self.reward_delta = tf.subtract(self.reward1, self.reward0, name="reward_delta")
+        self.abs_reward = tf.abs(self.reward_delta)
+        self.greed_index = tf.argmax(self.abs_reward , axis=1)
+        self.rewardy = tf.gather(self.reward1, self.greed_index, axis=1)
+
         self.target_shared_tf = target_shared(normalized_obs1)
         self.target_index_actor_tf = target_index_actor(self.target_shared_tf)
 
-        Q_param_obs1 = denormalize(target_param_critic(self.target_shared_tf, target_param_actor(self.target_shared_tf)), self.ret_rms)
-        self.target_param_Q = self.rewards + (1. - self.terminals1) * gamma * Q_param_obs1 # 199 + 1 * .99 * THE VALUE OF THE CURRENT POSITION
+        Q_param_obs1 = denormalize(target_param_critic(normalized_obs1, target_param_actor(self.target_shared_tf)), self.ret_rms)
+        self.target_param_Q = self.reward + (1. - self.terminals1) * gamma * Q_param_obs1 # self.qi(self.reward1, self.reward0)
 
-        Q_index_obs1 = denormalize(target_index_critic(self.target_shared_tf, self.candidate_actions), self.ret_rms)
-        self.target_index_Q = self.rewards + (1. - self.terminals1) * gamma * Q_index_obs1
-
-        # values
+        Q_index_obs1 = denormalize(target_index_critic(normalized_obs1, self.candidate_actions), self.ret_rms)
+        self.target_index_Q = self.reward + (1. - self.terminals1) * gamma * Q_index_obs1
 
         # Set up parts
         # ------------------------------------------------------------------------------------------------------------->
@@ -279,41 +284,38 @@ class Agent():
 
     def setup_optimizers(self):
 
-        logger.info('setting up param actor optimizer')
+        #logger.info('setting up param actor optimizer')
         self.param_actor_loss = -tf.reduce_mean(self.param_critic_with_actor_tf)
 
         param_actor_shapes = [var.get_shape().as_list() for var in self.param_actor.trainable_vars]
         param_actor_nb_params = sum([reduce(lambda x, y: x * y, shape) for shape in param_actor_shapes])
 
-        logger.info('  param actor shapes: {}'.format(param_actor_shapes))
-        logger.info('  param actor params: {}'.format(param_actor_nb_params))
-
         self.param_actor_grads = U.flatgrad(self.param_actor_loss, self.param_actor.trainable_vars, clip_norm=self.clip_norm)
         self.param_actor_optimizer = MpiAdam(var_list=self.param_actor.trainable_vars, beta1=0.9, beta2=0.999, epsilon=1e-08)
 
 
-        logger.info('setting up index actor optimizer')
+        #logger.info('setting up index actor optimizer')
         self.index_actor_loss = -tf.reduce_mean(self.index_critic_tf)
 
         index_actor_shapes = [var.get_shape().as_list() for var in self.index_actor.trainable_vars]
         index_actor_nb_params = sum([reduce(lambda x, y: x * y, shape) for shape in index_actor_shapes])
 
-        logger.info('  index actor shapes: {}'.format(index_actor_shapes))
-        logger.info('  index actor params: {}'.format(index_actor_nb_params))
+        #logger.info('  index actor shapes: {}'.format(index_actor_shapes))
+        #logger.info('  index actor params: {}'.format(index_actor_nb_params))
 
         self.index_actor_grads = U.flatgrad(self.index_actor_loss, self.index_actor.trainable_vars, clip_norm=self.clip_norm)
         self.index_actor_optimizer = MpiAdam(var_list=self.index_actor.trainable_vars, beta1=0.9, beta2=0.999,  epsilon=1e-08)
 
-        logger.info('setting up param critic optimizer')
+        #logger.info('setting up param critic optimizer')
         normalized_param_critic_target_tf = tf.clip_by_value(normalize(self.param_critic_target, self.ret_rms),
                                                        self.return_range[0], self.return_range[1])
         self.param_critic_loss = tf.reduce_mean(tf.square(self.normalized_param_critic_tf - normalized_param_critic_target_tf))
         if self.param_critic_l2_reg > 0.:
             param_critic_reg_vars = [var for var in self.param_critic.trainable_vars if
                                'kernel' in var.name and 'output' not in var.name]
-            for var in param_critic_reg_vars:
-                logger.info('  regularizing: {}'.format(var.name))
-            logger.info('  applying l2 regularization with {}'.format(self.param_critic_l2_reg))
+            #for var in param_critic_reg_vars:
+                #logger.info('  regularizing: {}'.format(var.name))
+            #logger.info('  applying l2 regularization with {}'.format(self.param_critic_l2_reg))
             param_critic_reg = tc.layers.apply_regularization(
                 tc.layers.l2_regularizer(self.param_critic_l2_reg),
                 weights_list=param_critic_reg_vars
@@ -321,22 +323,22 @@ class Agent():
             self.param_critic_loss += param_critic_reg
         param_critic_shapes = [var.get_shape().as_list() for var in self.param_critic.trainable_vars]
         param_critic_nb_params = sum([reduce(lambda x, y: x * y, shape) for shape in param_critic_shapes])
-        logger.info('  param critic shapes: {}'.format(param_critic_shapes))
-        logger.info('  param critic params: {}'.format(param_critic_nb_params))
+        #l#ogger.info('  param critic shapes: {}'.format(param_critic_shapes))
+        #logger.info('  param critic params: {}'.format(param_critic_nb_params))
         self.param_critic_grads = U.flatgrad(self.param_critic_loss, self.param_critic.trainable_vars, clip_norm=self.clip_norm)
         self.param_critic_optimizer = MpiAdam(var_list=self.param_critic.trainable_vars,
                                         beta1=0.9, beta2=0.999, epsilon=1e-08)
 
-        logger.info('setting up index critic optimizer')
+        #logger.info('setting up index critic optimizer')
         normalized_index_critic_target_tf = tf.clip_by_value(normalize(self.index_critic_target, self.ret_rms),
                                                        self.return_range[0], self.return_range[1])
         self.index_critic_loss = tf.reduce_mean(tf.square(self.normalized_index_critic_tf - normalized_index_critic_target_tf))
         if self.index_critic_l2_reg > 0.:
             index_critic_reg_vars = [var for var in self.index_critic.trainable_vars if
                                'kernel' in var.name and 'output' not in var.name]
-            for var in index_critic_reg_vars:
-                logger.info('  regularizing: {}'.format(var.name))
-            logger.info('  applying l2 regularization with {}'.format(self.index_critic_l2_reg))
+            #for var in index_critic_reg_vars:
+                #logger.info('  regularizing: {}'.format(var.name))
+            #logger.info('  applying l2 regularization with {}'.format(self.index_critic_l2_reg))
             index_critic_reg = tc.layers.apply_regularization(
                 tc.layers.l2_regularizer(self.index_critic_l2_reg),
                 weights_list=index_critic_reg_vars
@@ -344,8 +346,8 @@ class Agent():
             self.index_critic_loss += index_critic_reg
         index_critic_shapes = [var.get_shape().as_list() for var in self.index_critic.trainable_vars]
         index_critic_nb_params = sum([reduce(lambda x, y: x * y, shape) for shape in index_critic_shapes])
-        logger.info('  index critic shapes: {}'.format(index_critic_shapes))
-        logger.info('  index critic params: {}'.format(index_critic_nb_params))
+        #logger.info('  index critic shapes: {}'.format(index_critic_shapes))
+        #logger.info('  index critic params: {}'.format(index_critic_nb_params))
         self.index_critic_grads = U.flatgrad(self.index_critic_loss, self.index_critic.trainable_vars, clip_norm=self.clip_norm)
         self.index_critic_optimizer = MpiAdam(var_list=self.index_critic.trainable_vars,
                                         beta1=0.9, beta2=0.999, epsilon=1e-08)
@@ -423,13 +425,27 @@ class Agent():
         )
         return candidates[np.argmax(candidate_dist)]
 
-    def store_transition(self, obs0, index_action, candidate_actions, param_action, reward, obs1, terminal1):
-        self.memory.append(obs0, index_action, candidate_actions, param_action, reward, obs1, terminal1)
+    def sum_changes(self, rewards1, rewards0):
+        delta = 0
+        for reward0, reward1 in zip(rewards0, rewards1):
+            delta += abs(reward1 - reward0)
+        return delta
+
+    def qi(self, rewards1, rewards0):
+        reward_delta = []
+        for reward0, reward1 in zip(rewards0, rewards1):
+            reward_delta.append(abs(reward1-reward0))
+        task_index = np.argmax(reward_delta)
+        return rewards1[task_index]
+
+    def store_transition(self, obs, new_obs, index_action, candidate_actions, param_action, rewards, new_rewards, done, step):
+        self.memory.append(obs, new_obs, index_action, candidate_actions, param_action, rewards, new_rewards, done, step)
         #if self.normalize_observations: #todo
         #    self.obs_rms.update(np.array([obs0]))
 
     def train(self):
         batch = self.memory.sample(batch_size=self.batch_size)
+
 
         if self.normalize_returns and self.enable_popart:
             old_mean, old_std, target_param_Q, target_index_Q = self.sess.run(
@@ -441,7 +457,8 @@ class Agent():
                 ],
                 feed_dict={
                     self.obs1: batch['obs1'],
-                    self.rewards: batch['rewards'],
+                    self.reward0: batch['rewards0'],
+                    self.reward1: batch['rewards1'],
                     self.terminals1: batch['terminals1'].astype('float32'),
                 }
             )
@@ -477,7 +494,8 @@ class Agent():
                 ],
                 feed_dict={
                     self.obs1: batch['obs1'],
-                    self.rewards: batch['rewards'],
+                    self.reward0: batch['rewards0'],
+                    self.reward1: batch['rewards1'],
                     self.terminals1: batch['terminals1'].astype('float32'),
                 }
             )
@@ -510,6 +528,7 @@ class Agent():
                 self.param_critic_target: target_param_Q,
             }
         )
+
         self.index_actor_optimizer.update(index_actor_grads, stepsize=self.index_actor_lr)
         self.index_critic_optimizer.update(index_critic_grads, stepsize=self.index_critic_lr)
 
@@ -522,7 +541,6 @@ class Agent():
         self.sess.run(self.target_index_soft_updates)
         self.sess.run(self.target_param_soft_updates)
 
-    #todo
     def setup_stats(self):
         ops = []
         names = []
@@ -582,7 +600,7 @@ class Agent():
         values = self.sess.run(self.stats_ops, feed_dict={
             self.obs0: self.stats_sample['obs0'],
             self.candidate_actions: self.stats_sample['candidate_actions'],
-            self.actions: self.stats_sample['actions'],
+            self.param_actions: self.stats_sample['param_actions'],
         })
 
         names = self.stats_names[:]

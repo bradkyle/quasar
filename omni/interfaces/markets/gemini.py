@@ -307,7 +307,7 @@ def get_balance(input):
 # =====================================================================================================================>
 
 def profit_over_time(input):
-
+    print("PROFIT")
     endpoint = '/balances'
 
     payload = {
@@ -317,6 +317,8 @@ def profit_over_time(input):
 
     response = _invoke_api(endpoint, payload, keys=input.key_set, pub=False, encode=False)
     response = json.loads(response)
+    print(str(response))
+    print("PROFITILY")
     for balance in response:
        if balance["currency"] == input.currency:
             balance_value = 0

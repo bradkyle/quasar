@@ -17,6 +17,8 @@ class MarketBase(object):
         value = float(response["ticker"]["price"]) * float(balance)
         return value
 
+    #todo this should account for the fact that prices might not have enough time to change between steps
+
     def profit_over_time(self, id, balance_value):
         if id in self.prev_balances:
             prev_balance = self.prev_balances[id]

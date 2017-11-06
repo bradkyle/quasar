@@ -1,18 +1,18 @@
 import logging
 import os
 import time
-from agent.memory import Memory
+from tscl_agent.memory import Memory
 import common.logger as logger
-from agent.models import Shared, Critic, Actor
-from agent.noise import *
+from tscl_agent.models import Shared, Critic, Actor
+from tscl_agent.noise import *
 from omni import omni
-from agent.util import mpi_mean, mpi_std, mpi_max, mpi_sum
+from tscl_agent.util import mpi_mean, mpi_std, mpi_max, mpi_sum
 import gym
 import pickle
 import tensorflow as tf
 from collections import deque
 import common.tf_util as U
-from agent.agent import Agent
+from tscl_agent.agent import Agent
 
 
 
@@ -107,15 +107,14 @@ class Worker():
         max_param_action = self.env.param_action_space.high
         logger.info('scaling actions by {} before executing in env'.format(max_param_action))
         self.agent = Agent(
+                     env = self.env,
                      shared = self.shared,
                      index_actor = self.index_actor,
                      index_critic = self.index_critic,
                      param_actor = self.param_actor,
                      param_critic = self.param_critic,
                      memory = self.memory,
-                     observation_shape=self.env.observation_space.shape,
                      param_action_shape=self.env.param_action_space.shape,
-                     index_action_shape=self.env.index_action_space.shape,
                      rewards_shape=self.env.reward_space.shape,
                      candidates_shape=self.k,
                      gamma=gamma,
@@ -144,15 +143,14 @@ class Worker():
         episode_rewards_history = deque(maxlen=100)
 
         # Prepare everything.
-        obs = self.env.reset()
-        if isinstance(obs,list):
-            obs = np.asarray(obs)
+        obs = np.zeros(self.env.observation_space.shape)
+        rewards = np.zeros(self.env.reward_space.shape)
 
         done = False
         episode_reward = []
         episode_step = 0
         episodes = 0
-        t = 0
+        step = 0
 
         epoch = 0
         start_time = time.time()
@@ -183,28 +181,25 @@ class Worker():
                         # spawns k closest actions in action embedding and thereafter
                         # determines most favorable of the candidates based on
                         # predicted future reward.
-                        candidate_actions = self.env.spawn(index_action, self.k) #todo assert candidate actions within self.candidate_action_space
+                        candidate_actions = self.env.spawn(index_action, self.k)
                         index = self.agent.val(obs, candidate_actions)
                         action = [index, list((np.asarray(param_action) + 1)/2)]
 
                         # Execute step in environment
-                        new_obs, r, done, info = self.env.step(action)
+                        new_obs, new_rewards, done, info = self.env.step(action)
 
-                        t += 1
+                        step += 1
                         if self.rank == 0 and self.render:
                             self.env.render()
-                        episode_reward.append(r)
+                        episode_reward.append(new_rewards)
                         episode_step += 1
-
-                        if isinstance(new_obs, list):
-                            x = np.asarray(new_obs)
-                            new_obs = x[0]
 
                         # Book-keeping.
                         epoch_actions.append(action)
                         epoch_qs.append(q)
-                        self.agent.store_transition(obs, index_action, candidate_actions, param_action, r, new_obs, done)
+                        self.agent.store_transition(obs, new_obs, index_action, candidate_actions, param_action, rewards, new_rewards, done, step)
                         obs = new_obs
+                        rewards = new_rewards
 
                         if done:
                             # Episode done.
@@ -218,6 +213,7 @@ class Worker():
 
                             self.agent.reset()
                             obs = self.env.reset()
+                            rewards = self.env.reward_space.sample()
 
                     # Train.
                     epoch_index_actor_losses = []
@@ -230,7 +226,6 @@ class Worker():
                         if self.memory.nb_entries >= self.batch_size and t % self.param_noise_adaption_interval == 0:
                             distance = self.agent.adapt_param_noise()
                             epoch_adaptive_distances.append(distance)
-
                         icl, ial, pcl, pal = self.agent.train()
                         epoch_index_actor_losses.append(icl)
                         epoch_index_critic_losses.append(ial)
@@ -271,7 +266,7 @@ class Worker():
                     combined_stats['total/steps_per_second'] = mpi_mean(float(t) / float(duration))
                     combined_stats['total/episodes'] = mpi_mean(episodes)
                     combined_stats['total/epochs'] = epoch + 1
-                    combined_stats['total/steps'] = t
+                    combined_stats['total/steps'] = step
 
                     # Env Statistics
                     combined_stats['projected_return/current_balance/day'] = NotImplemented
@@ -317,3 +312,5 @@ class Worker():
 
                     #todo randomizer randomize normal env
 
+        def train():
+            return NotImplemented

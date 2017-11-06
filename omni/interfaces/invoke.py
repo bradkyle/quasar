@@ -35,33 +35,34 @@ def invoke(method, url, headers=None, body=None, params=None, payload=None, sess
         json_request = json.dumps(r)
         f.write(json_request)
 
-    # todo check for none response and return a standard response in that instance
-
     try:
         response_object = session.send(prepared)
+        if response_object is None:
+            raise omni.error.NoneResponseError
+
         if encode:
             observation = process(response_object.text)
         else:
             observation = response_object.text
 
-        if observation is None:
-            raise omni.error.NoneResponseError
-
         return observation
 
-    except omni.error.NoneResponseError:
+    except omni.error.NoneResponseError as e:
+        print("Encountered error: "+ str(e))
         NoneResponsePenalty()
         WaitPenalty(2)
         time.sleep(2)
         invoke(method, url, headers, body, params, payload, session, encode)
 
-    except requests.exceptions.HTTPError:
+    except requests.exceptions.HTTPError as e:
+        print("Encountered error: " + str(e))
         BadRequestPenalty()
         WaitPenalty(2)
         time.sleep(2)
         invoke(method, url, headers, body, params, payload, session, encode)
 
-    except requests.ConnectionError:
+    except requests.ConnectionError as e:
+        print("Encountered error: " + str(e))
         BadConnectionPenalty()
         WaitPenalty(2)
         time.sleep(2)

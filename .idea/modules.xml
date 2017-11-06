@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/../analysis/VDCNN/.idea/VDCNN.iml" filepath="$PROJECT_DIR$/../analysis/VDCNN/.idea/VDCNN.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/quasar.iml" filepath="$PROJECT_DIR$/.idea/quasar.iml" />
     </modules>
   </component>

@@ -56,6 +56,6 @@ class AffordanceDisabledPenalty(Penalty):
         Penalty.__init__(self, penalty, store, response)
 
 
-class WaitPenalty():
-    def __init__(self, wait):
-        raise NotImplemented
+class WaitPenalty(Penalty):
+    def __init__(self, wait, penalty=75, store='', response=None):
+        Penalty.__init__(self, penalty, store, response)
