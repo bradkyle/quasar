@@ -10,6 +10,9 @@ from omni import omni
 import numpy as np
 from omni.config import MAX_PARAMS
 
+np.set_printoptions(0)
+
+
 class TestWorker(unittest.TestCase):
     def setUp(self):
         # self.worker = Worker(id=0, layer_norm=True, noise_type='adaptive-param_0.2')
@@ -68,11 +71,13 @@ class TestAgent(unittest.TestCase):
            candidates_shape=self.k
        )
 
+
+
        with open('./test/test.json') as data_file:
            self.data = json.load(data_file)
 
            for d in self.data:
-               self.memory.append(obs=d["obs"],
+               self.agent.memory.append(obs=d["obs"],
                                   new_obs=d["new_obs"],
                                   index_action=d["index_action"],
                                   candidate_actions=d["candidate_action"],
@@ -83,42 +88,47 @@ class TestAgent(unittest.TestCase):
                                   step=d["step"]
                                   )
 
-       self.sess = tf.Session()
+
+
 
    def test_qi(self):
-       batch = self.memory.get()
-       assert batch['new_rewards'].shape == batch['rewards'].shape
-       self.assertCountEqual(batch['rewards'][1] , batch['new_rewards'][0])
+       with U.single_threaded_session() as sess:
+           batch = self.agent.memory.sample(batch_size=self.batch_size)
 
+           reward_delta, abs_reward, greed_index, reward0, reward1, gathered = sess.run(
+               fetches=[
+                        self.agent.reward_delta,
+                        self.agent.abs_reward,
+                        self.agent.greed_index,
+                        self.agent.rewards0,
+                        self.agent.rewards1,
+                        self.agent.gathered,
+               ],
+               feed_dict={
+                   self.agent.rewards1: batch['new_rewards'],
+                   self.agent.rewards0: batch['rewards']
+               }
+           )
 
+           print("--------------------------------------------------------------------------")
+           print("reward: " + str(reward0), str(reward0.shape))
+           print("--------------------------------------------------------------------------")
+           print("new reward: " + str(reward1), str(reward1.shape))
+           print("--------------------------------------------------------------------------")
+           print("reward delta: "+str(reward_delta), str(reward_delta.shape))
+           print("--------------------------------------------------------------------------")
+           print("absolute reward: "+str(abs_reward), str(abs_reward.shape))
+           print("--------------------------------------------------------------------------")
+           print("greed index: "+str(greed_index), str(greed_index.shape))
+           print("--------------------------------------------------------------------------")
+           print("gathered: " + str(gathered[0]), str(gathered.shape))
 
-       reward_delta, abs_reward, greed_index, reward0, reward1, rewardy = self.sess.run(
-           fetches=[
-                    self.agent.reward_delta,
-                    self.agent.abs_reward,
-                    self.agent.greed_index,
-                    self.agent.reward0,
-                    self.agent.reward1,
-                    self.agent.rewardy,
-           ],
-           feed_dict={
-               self.agent.reward1: batch['new_rewards'],
-               self.agent.reward0: batch['rewards']
-           }
-       )
-       print("--------------------------------------------------------------------------")
-       print("rewardy: " + str(rewardy), str(rewardy.shape))
-       print("--------------------------------------------------------------------------")
-       print("reward: " + str(reward0), str(reward0.shape))
-       print("--------------------------------------------------------------------------")
-       print("new reward: " + str(reward1), str(reward1.shape))
-       print("--------------------------------------------------------------------------")
-       print("reward delta: "+str(reward_delta), str(reward_delta.shape))
-       print("--------------------------------------------------------------------------")
-       print("absolute reward: "+str(abs_reward), str(abs_reward.shape))
-       print("--------------------------------------------------------------------------")
-       print("greed index: "+str(greed_index), str(greed_index.shape))
+           reward = self.agent.qi(batch['new_rewards'][1], batch['rewards'][1])
+           assert reward in batch['new_rewards'][1]
 
-       reward = self.agent.qi(batch['new_rewards'][1], batch['rewards'][1])
-       assert reward in batch['new_rewards'][1]
-       assert self.agent.greed_index.shape == (1,)
+           sess.close()
+
+   def test_train(self):
+       with U.single_threaded_session() as sess:
+           self.agent.initialize(sess)
+           icl, ial, pcl, pal = self.agent.train()

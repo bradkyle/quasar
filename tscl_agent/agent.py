@@ -95,8 +95,8 @@ class Agent():
         self.terminals1 = tf.placeholder(tf.float32, shape=(None, 1), name='terminals1')
         self.step = tf.placeholder(tf.float32, shape=(None, 1), name='step')
         self.reward = tf.placeholder(tf.float32, shape=(None, 1), name='reward')
-        self.reward0 = tf.placeholder(tf.float32, shape=(None,) + rewards_shape, name='reward0')
-        self.reward1 = tf.placeholder(tf.float32, shape=(None,) + rewards_shape, name='reward1')
+        self.rewards0 = tf.placeholder(tf.float32, shape=(None,) + rewards_shape, name='reward0')
+        self.rewards1 = tf.placeholder(tf.float32, shape=(None,) + rewards_shape, name='reward1')
         self.candidate_actions = tf.placeholder(tf.float32, shape=(None, candidates_shape), name='candidate_actions')
         self.param_actions = tf.placeholder(tf.float32, shape=(None,) + param_action_shape, name='actions')
         self.index_critic_target = tf.placeholder(tf.float32, shape=(None, 1), name='index_critic_target')
@@ -204,22 +204,23 @@ class Agent():
         # Target Models
         # ------------------------------------------------------------------------------------------------------------->
 
-        self.reward_delta = tf.subtract(self.reward1, self.reward0, name="reward_delta")
+        self.reward_delta = tf.subtract(self.rewards1, self.rewards0, name="reward_delta")
         self.abs_reward = tf.abs(self.reward_delta)
         self.greed_index = tf.argmax(self.abs_reward , axis=1)
-        self.rewardy = tf.gather(self.reward1, self.greed_index, axis=1)
+        self.gathered = tf.gather(self.rewards1, self.greed_index, axis=1)
 
         self.target_shared_tf = target_shared(normalized_obs1)
         self.target_index_actor_tf = target_index_actor(self.target_shared_tf)
 
         Q_param_obs1 = denormalize(target_param_critic(normalized_obs1, target_param_actor(self.target_shared_tf)), self.ret_rms)
-        self.target_param_Q = self.reward + (1. - self.terminals1) * gamma * Q_param_obs1 # self.qi(self.reward1, self.reward0)
+        self.target_param_Q = self.gathered + (1. - self.terminals1) * gamma * Q_param_obs1 # self.qi(self.rewards1, self.rewards0)
 
         Q_index_obs1 = denormalize(target_index_critic(normalized_obs1, self.candidate_actions), self.ret_rms)
-        self.target_index_Q = self.reward + (1. - self.terminals1) * gamma * Q_index_obs1
+        self.target_index_Q = self.gathered + (1. - self.terminals1) * gamma * Q_index_obs1
 
         # Set up parts
         # ------------------------------------------------------------------------------------------------------------->
+
         if self.param_noise is not None:
             self.setup_param_noise(normalized_obs0)
         self.setup_optimizers()
@@ -456,9 +457,10 @@ class Agent():
                     self.target_index_Q
                 ],
                 feed_dict={
-                    self.obs1: batch['obs1'],
-                    self.reward0: batch['rewards0'],
-                    self.reward1: batch['rewards1'],
+                    self.obs1: batch['new_obs'],
+                    self.rewards0: batch['rewards'],
+                    self.rewards1: batch['new_rewards'],
+                    self.candidate_actions: batch['candidate_actions'],
                     self.terminals1: batch['terminals1'].astype('float32'),
                 }
             )
@@ -493,9 +495,10 @@ class Agent():
                     self.target_param_Q
                 ],
                 feed_dict={
-                    self.obs1: batch['obs1'],
-                    self.reward0: batch['rewards0'],
-                    self.reward1: batch['rewards1'],
+                    self.obs1: batch['new_obs'],
+                    self.rewards0: batch['rewards'],
+                    self.rewards1: batch['new_rewards'],
+                    self.candidate_actions: batch['candidate_actions'],
                     self.terminals1: batch['terminals1'].astype('float32'),
                 }
             )
@@ -521,7 +524,7 @@ class Agent():
                 self.param_critic_loss
             ],
             feed_dict={
-                self.obs0: batch['obs0'],
+                self.obs0: batch['obs'],
                 self.param_actions: batch['param_actions'],
                 self.candidate_actions: batch['candidate_actions'],
                 self.index_critic_target: target_index_Q,

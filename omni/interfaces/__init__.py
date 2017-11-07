@@ -57,9 +57,9 @@ for pair in ["btcusd", "ethusd", "ethbtc"]:
     affordance(entry_point='omni.interfaces.markets.gemini:get_auction_history', symbol=pair)
 
 for key_set in [
-    {"private": "3go1mGK4QSJkpFMdxtadRM6e9NoM", "public": "FdAVXfnhsnGwiEOOlDJY"},  # smithmalcolm46@gmail.com
+    #{"private": "3go1mGK4QSJkpFMdxtadRM6e9NoM", "public": "FdAVXfnhsnGwiEOOlDJY"},  # smithmalcolm46@gmail.com
     {"private": "u8rGPS1AvbWNqreT2U9rT4xAPPk", "public": "QzeR2u1AZuf5S6lXWrfo"},  # bradkyleduncan@gmail.com
-    {"private": "26NheKRMDt6q24NFUASYVDYE4KPw", "public": "meMqYdKRQsxZDjOU6MRn"},  # wilnatfor@gmail.com
+    #{"private": "26NheKRMDt6q24NFUASYVDYE4KPw", "public": "meMqYdKRQsxZDjOU6MRn"},  # wilnatfor@gmail.com
 ]:
     for currency in ["BTC", "ETH", "USD"]:
         task(entry_point='omni.interfaces.markets.gemini:profit_over_time', key_set=key_set, currency=currency)

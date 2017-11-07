@@ -13,7 +13,7 @@ def gen():
 
     f = open("./test/test.json", "a+")
     data = []
-    for i in range(2):
+    for i in range(4):
         random_action = [np.random.rand(1), np.random.rand(1, int(MAX_PARAMS))]
         new_obs, new_rewards, done, info = env.step(random_action)
         step += 1

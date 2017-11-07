@@ -37,8 +37,8 @@ def invoke(method, url, headers=None, body=None, params=None, payload=None, sess
 
     try:
         response_object = session.send(prepared)
-        if response_object is None:
-            raise omni.error.NoneResponseError
+        if response_object.text is None:
+            raise omni.error.NoneResponseError("There was no content in the response, status code:" +str(response_object.status_code))
 
         if encode:
             observation = process(response_object.text)
@@ -50,20 +50,20 @@ def invoke(method, url, headers=None, body=None, params=None, payload=None, sess
     except omni.error.NoneResponseError as e:
         print("Encountered error: "+ str(e))
         NoneResponsePenalty()
-        WaitPenalty(2)
-        time.sleep(2)
+        WaitPenalty(10)
+        time.sleep(10)
         invoke(method, url, headers, body, params, payload, session, encode)
 
     except requests.exceptions.HTTPError as e:
         print("Encountered error: " + str(e))
         BadRequestPenalty()
-        WaitPenalty(2)
-        time.sleep(2)
+        WaitPenalty(10)
+        time.sleep(10)
         invoke(method, url, headers, body, params, payload, session, encode)
 
     except requests.ConnectionError as e:
         print("Encountered error: " + str(e))
         BadConnectionPenalty()
-        WaitPenalty(2)
-        time.sleep(2)
+        WaitPenalty(10)
+        time.sleep(10)
         invoke(method, url, headers, body, params, payload, session, encode)

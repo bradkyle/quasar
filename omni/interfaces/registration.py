@@ -15,7 +15,13 @@ class Input():
             setattr(self, key, value)
         self.args = None
 
+class Channel():
+    def __init__(self):
+        raise NotImplemented
 
+class ChannelRegistry():
+    def __init__(self):
+        raise NotImplemented
 
 # Affordance
 # --------------------------------------------------------------------------------------------------------------------->
@@ -189,3 +195,28 @@ cache_registry = CacheRegistry()
 
 def cache():
     cache_registry.register()
+
+# Feature
+# --------------------------------------------------------------------------------------------------------------------->
+
+class Feature():
+    def __init__(self):
+        raise NotImplemented
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplemented
+
+
+class FeatureRegistry():
+    def __init__(self):
+        self.features = {}
+
+    def register(self):
+        raise NotImplemented
+
+
+feature_registry = FeatureRegistry()
+
+
+def feature():
+    feature_registry.register()

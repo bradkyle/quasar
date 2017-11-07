@@ -6,6 +6,7 @@ import uuid
 from omni.interfaces.registration import affordance_registry, task_registry
 from omni.config import MAX_PARAMS, MAX_LENGTH, CHAR_EMBEDDING
 
+# todo add support for running omni on a seperate thread
 
 class Omni():
     def __init__(self):
@@ -17,10 +18,6 @@ class Omni():
         instance = Instance(instance_id)
         self.instances[instance_id] = instance
         return instance
-
-    @property
-    def action_embedding(self):
-        return affordance_registry.active_affordances
 
 
 class Instance(gym.Env):
