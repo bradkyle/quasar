@@ -13,6 +13,8 @@ class Omni():
         self.instances = {}
         self.id_len = 10
 
+
+
     def instantiate(self):
         instance_id = str(uuid.uuid4().hex)[:self.id_len]
         instance = Instance(instance_id)
@@ -38,13 +40,9 @@ class Instance(gym.Env):
         print("Cannot seed a live environment!")
 
     def _step(self, action):
-        print(action)
-        affordance = affordance_registry.lookup(15) #
-        self.observation= affordance(*action[1])
-        print("rewarding")
+        affordance = affordance_registry.lookup(15)
+        self.observation = affordance(*action[1])
         self.reward = task_registry.aggregate()
-        print("rewarded")
-        print(self.reward)
         return self.observation, self.reward, self.done, self.info
 
     def spawn(self, index, k):

@@ -1,4 +1,4 @@
-from omni.interfaces.registration import affordance_registry
+from omni.interfaces.registration import affordance_registry, feature_registry
 
 class Randomiser():
     """
@@ -10,3 +10,4 @@ class Randomiser():
     """
     def __init__(self, env, entropy_rate):
         self.env = env
+

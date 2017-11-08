@@ -2,11 +2,11 @@ import os
 
 import time
 import baselines.common.tf_util as U
-from tscl_agent.run import Worker
+from agents.tscl_agent.run import Worker
 import multiprocessing
 import threading
 import argparse
-from  common.misc_util import boolean_flag
+from  agents.common.misc_util import boolean_flag
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 

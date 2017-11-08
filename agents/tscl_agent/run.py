@@ -1,18 +1,18 @@
 import logging
 import os
 import time
-from tscl_agent.memory import Memory
-import common.logger as logger
-from tscl_agent.models import Shared, Critic, Actor
-from tscl_agent.noise import *
-from omni import omni
-from tscl_agent.util import mpi_mean, mpi_std, mpi_max, mpi_sum
+from agents.tscl_agent.memory import Memory
+import agents.common.logger as logger
+from agents.tscl_agent.models import Shared, Critic, Actor
+from agents.tscl_agent.noise import *
+import omni
+from agents.tscl_agent.util import mpi_mean, mpi_std, mpi_max, mpi_sum
 import gym
 import pickle
 import tensorflow as tf
 from collections import deque
-import common.tf_util as U
-from tscl_agent.agent import Agent
+import agents.common.tf_util as U
+from agents.tscl_agent.agent import Agent
 
 
 

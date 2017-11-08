@@ -15,13 +15,14 @@ class Input():
             setattr(self, key, value)
         self.args = None
 
-class Channel():
+class Interface():
     def __init__(self):
         raise NotImplemented
 
-class ChannelRegistry():
+class InterfaceRegistry():
     def __init__(self):
         raise NotImplemented
+
 
 # Affordance
 # --------------------------------------------------------------------------------------------------------------------->
@@ -125,7 +126,7 @@ class TaskRegistry():
     def aggregate(self):
         rewards = []
         for task in self.tasks.values():
-            rewards.append(float(task()))
+            rewards.append(float(task())) #todo async
         return rewards
 
     def list_all(self):
@@ -167,7 +168,7 @@ class CloserRegistry():
 
     def close(self):
         for close in self.closers.values():
-            close()
+            close() #todo async
 
 closer_registry = CloserRegistry()
 
@@ -179,7 +180,7 @@ def closer(entry_point, **kwargs):
 
 class Cache():
     def __init__(self):
-        raise NotImplemented
+        self.caches = {}
 
     def __call__(self, *args, **kwargs):
         raise NotImplemented
@@ -211,12 +212,11 @@ class FeatureRegistry():
     def __init__(self):
         self.features = {}
 
-    def register(self):
+    def register(self, entry_point, **kwargs):
         raise NotImplemented
 
 
 feature_registry = FeatureRegistry()
 
-
-def feature():
-    feature_registry.register()
+def feature(entry_point, **kwargs):
+    feature_registry.register(entry_point, **kwargs)

@@ -1,22 +1,27 @@
-from omni.interfaces.registration import affordance, task, closer
+from omni.interfaces.registration import affordance, task, closer, cache, feature
 import requests_cache
+# todo make asynchronous
+# are features enabled
+
 
 # Cache
 # --------------------------------------------------------------------------------------------------------------------->
 
-
-# Store
-# --------------------------------------------------------------------------------------------------------------------->
-
+# cache(name="cryptonator",    expire_after=30, rate_limit=2)
+# cache(name="gemini_public",  expire_after=30, rate_limit=120)
+# cache(name="gemini_private", expire_after=30, rate_limit=600)
+# cache(name="twitter_search", expire_after=320)
+# cache(name="blockchain_charts", expire_after=84000)
+# cache(name="blockchain_info", expire_after=900)
+# cache(name="coinmarketcap", expire_after=900)
 
 
 # Base
 # --------------------------------------------------------------------------------------------------------------------->
 
-task(entry_point='omni.interfaces.base.penalise:penalise_connection_errors')
-task(entry_point='omni.interfaces.base.penalise:penalise_connection_error')
-task(entry_point='omni.interfaces.base.penalise:penalise_response_size')
-task(entry_point='omni.interfaces.base.penalise:step_loss')
+for penalty_name in ['bad_request_penalty','bad_connection_penalty','none_response_penalty','not_afforded_penalty','rate_limit_penalty',
+                     'step_penalty','not_found_penalty','response_size_penalty','affordance_disabled_penalty','wait_penalty']:
+    task(entry_point='omni.interfaces.base.penalise:aggregate_penalty', penalty_name=penalty_name)
 
 affordance(entry_point="omni.interfaces.base.omni:list_affordances")
 affordance(entry_point="omni.interfaces.base.omni:list_tasks")
@@ -32,6 +37,7 @@ for chart in ["total-bitcoins","market-price","market-cap","trade-volume",
                       "utxo-count", "n-transactions-excluding-chains-longer-than-100", "output-volume", "estimated-transaction-volume",
                       "estimated-transaction-volume-usd", "my-wallet-n-users"]:
     affordance(entry_point='omni.interfaces.web.blockchain:get_chart', chart=chart, cached=True, cache_length=84000)
+    #feature()
 
 affordance(entry_point='omni.interfaces.web.blockchain:get_ticker')
 

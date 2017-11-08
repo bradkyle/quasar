@@ -1,1 +1,1 @@
-from omni.omni import omni
+from omni.omni import *

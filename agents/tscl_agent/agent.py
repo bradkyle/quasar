@@ -2,13 +2,13 @@ import tensorflow as tf
 from copy import copy
 from collections import deque
 import numpy as np
-from common.mpi_adam import MpiAdam
+from agents.common.mpi_adam import MpiAdam
 from functools import reduce
-import common.tf_util as U
+import agents.common.tf_util as U
 import tensorflow.contrib as tc
-from common.mpi_running_mean_std import RunningMeanStd
-from tscl_agent.util import reduce_std, mpi_mean
-import common.logger as logger
+from agents.common.mpi_running_mean_std import RunningMeanStd
+from agents.tscl_agent.util import reduce_std, mpi_mean
+import agents.common.logger as logger
 import numpy.random as rng
 from operator import sub
 

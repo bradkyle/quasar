@@ -1,5 +1,6 @@
 from omni.interfaces.invoke import invoke
 from omni.interfaces.processing import process
+from omni.interfaces.core import get_nonce
 import base64
 import hashlib
 import hmac
@@ -13,25 +14,13 @@ import requests_cache
 API_VERSION = '/v1'
 BASE_URI = "https://api.sandbox.gemini.com" + API_VERSION
 
+#todo has to account for multiple accounts
 def _get_next_order_id():
-    from omni.interfaces.store import current_gemini_order_id
+    from omni.interfaces.core import current_gemini_order_id
     current_gemini_order_id += 1
     return current_gemini_order_id
 
-def _get_nonce():
-    return time.time() * 1000
-
-
 def _invoke_api(endpoint, payload, params=None, pub=True, keys=None, encode=True):
-    """ Sends the request to the Gemini Exchange API.
-
-        Args:
-            endpoint (str):   URL the call will go to
-            payload (dict):   Headers containing the request specifics
-            params (dict, optional):    A dict containing URL parameters (for public API calls)
-            pub(bool, optional):    Boolean value identifying a Public API call (True) or Private API call (False)
-    """
-
 
     public_session = requests_cache.CachedSession(cache_name="gemini_public", expire_after=30, backend='sqlite')
     private_session =requests_cache.CachedSession(cache_name="gemini_private", expire_after=30,backend='sqlite')
@@ -73,7 +62,7 @@ def get_symbols(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce()
+        'nonce': get_nonce()
     }
 
     return _invoke_api(endpoint, payload, pub=True)
@@ -85,7 +74,7 @@ def get_ticker(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce()
+        'nonce': get_nonce()
     }
 
     return _invoke_api(endpoint, payload, pub=True)
@@ -97,7 +86,7 @@ def get_order_book(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce()
+        'nonce': get_nonce()
     }
 
     return _invoke_api(endpoint, payload, pub=True)
@@ -115,7 +104,7 @@ def get_trade_history(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce()
+        'nonce': get_nonce()
     }
 
     return _invoke_api(endpoint, payload, params, pub=True)
@@ -128,7 +117,7 @@ def get_current_auction(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce()
+        'nonce': get_nonce()
     }
 
     return _invoke_api(endpoint, payload, pub=True)
@@ -146,7 +135,7 @@ def get_auction_history(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce()
+        'nonce': get_nonce()
     }
 
     return _invoke_api(endpoint, payload, params, pub=True)
@@ -163,7 +152,7 @@ def get_active_orders(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce()
+        'nonce': get_nonce()
     }
 
     return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
@@ -177,7 +166,7 @@ def get_order_status(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce(),
+        'nonce': get_nonce(),
         'order_id': input.order_id
     }
 
@@ -191,7 +180,7 @@ def get_trade_volume(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce()
+        'nonce': get_nonce()
     }
 
     return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
@@ -205,7 +194,7 @@ def get_past_trades(input):
     payload = {
         'request': API_VERSION + endpoint,
         'symbol': input.symbol,
-        'nonce': _get_nonce(),
+        'nonce': get_nonce(),
         'limit_trades': limit_trades,
         'timestamp': timestamp
     }
@@ -227,7 +216,7 @@ def new_order(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce(),
+        'nonce': get_nonce(),
         'client_order_id': client_order_id,
         'symbol': input.symbol,
         'amount': amount,
@@ -261,7 +250,7 @@ def cancel_order(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce(),
+        'nonce': get_nonce(),
         'order_id': input.order_id
     }
 
@@ -273,7 +262,7 @@ def cancel_session_orders(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce()
+        'nonce': get_nonce()
     }
 
     return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
@@ -284,7 +273,7 @@ def cancel_all_orders(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce()
+        'nonce': get_nonce()
     }
 
     return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
@@ -298,7 +287,7 @@ def get_balance(input):
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce()
+        'nonce': get_nonce()
     }
 
     return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
@@ -307,18 +296,15 @@ def get_balance(input):
 # =====================================================================================================================>
 
 def profit_over_time(input):
-    print("PROFIT")
     endpoint = '/balances'
 
     payload = {
         'request': API_VERSION + endpoint,
-        'nonce': _get_nonce()
+        'nonce': get_nonce()
     }
 
     response = _invoke_api(endpoint, payload, keys=input.key_set, pub=False, encode=False)
     response = json.loads(response)
-    print(str(response))
-    print("PROFITILY")
     for balance in response:
        if balance["currency"] == input.currency:
             balance_value = 0
@@ -335,3 +321,5 @@ def profit_over_time(input):
             id = balance["currency"] + balance["type"] + input.key_set["public"]
             return market_base.profit_over_time(id, balance_value)
 
+# Features
+# =====================================================================================================================>
