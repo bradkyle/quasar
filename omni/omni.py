@@ -14,14 +14,13 @@ class Omni():
         self.id_len = 10
 
 
-
     def instantiate(self):
         instance_id = str(uuid.uuid4().hex)[:self.id_len]
         instance = Instance(instance_id)
         self.instances[instance_id] = instance
         return instance
 
-
+#todo allow for different interface registration scopes
 class Instance(gym.Env):
     def __init__(self, instance_id):
         self.instance_id = instance_id

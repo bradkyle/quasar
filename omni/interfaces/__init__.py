@@ -3,18 +3,10 @@ import requests_cache
 # todo make asynchronous
 # are features enabled
 
+DISCRETE = False
 
-# Cache
-# --------------------------------------------------------------------------------------------------------------------->
 
-# cache(name="cryptonator",    expire_after=30, rate_limit=2)
-# cache(name="gemini_public",  expire_after=30, rate_limit=120)
-# cache(name="gemini_private", expire_after=30, rate_limit=600)
-# cache(name="twitter_search", expire_after=320)
-# cache(name="blockchain_charts", expire_after=84000)
-# cache(name="blockchain_info", expire_after=900)
-# cache(name="coinmarketcap", expire_after=900)
-
+#todo implement scope for discrete and non discrete production live .etc
 
 # Base
 # --------------------------------------------------------------------------------------------------------------------->

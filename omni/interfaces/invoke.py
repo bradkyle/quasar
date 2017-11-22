@@ -2,8 +2,11 @@ import json
 import omni.error
 import requests
 import time
+import aiohttp
 from omni.interfaces.processing import process
 from omni.interfaces.penalise import BadRequestPenalty, BadConnectionPenalty, NoneResponsePenalty, WaitPenalty
+
+ASYNC = False
 
 def invoke(method, url, headers=None, body=None, params=None, payload=None, session=None, encode=True):
 
@@ -19,6 +22,10 @@ def invoke(method, url, headers=None, body=None, params=None, payload=None, sess
         response_object = session.send(prepared)
         if response_object.text is None:
             raise omni.error.NoneResponseError("There was no content in the response, status code:" +str(response_object.status_code))
+        if response_object.status_code != 200:
+            raise requests.exceptions.HTTPError
+
+        print(response_object.text)
 
         if encode:
             observation = process(response_object.text)
@@ -47,6 +54,4 @@ def invoke(method, url, headers=None, body=None, params=None, payload=None, sess
         WaitPenalty(10)
         time.sleep(10)
         invoke(method, url, headers, body, params, payload, session, encode)
-
-
 

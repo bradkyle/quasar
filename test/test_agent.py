@@ -1,12 +1,12 @@
 import json
 import unittest
-from tscl_agent.run import Worker
+from agents.tscl_agent.run import Worker
 import tensorflow as tf
-import baselines.common.tf_util as U
-from tscl_agent.models import Shared, Critic, Actor
-from tscl_agent.memory import Memory
-from tscl_agent.agent import Agent
-from omni import omni
+import agents.common.tf_util as U
+from agents.tscl_agent.models import Shared, Critic, Actor
+from agents.tscl_agent.memory import Memory
+from agents.tscl_agent.agent import Agent
+import omni
 import numpy as np
 from omni.config import MAX_PARAMS
 
@@ -90,9 +90,8 @@ class TestAgent(unittest.TestCase):
 
 
 
-
-   def test_qi(self):
-       with U.single_threaded_session() as sess:
+   def test_train(self):
+       with tf.Session() as sess:
            batch = self.agent.memory.sample(batch_size=self.batch_size)
 
            reward_delta, abs_reward, greed_index, reward0, reward1, gathered = sess.run(
@@ -110,25 +109,27 @@ class TestAgent(unittest.TestCase):
                }
            )
 
-           print("--------------------------------------------------------------------------")
-           print("reward: " + str(reward0), str(reward0.shape))
-           print("--------------------------------------------------------------------------")
-           print("new reward: " + str(reward1), str(reward1.shape))
-           print("--------------------------------------------------------------------------")
-           print("reward delta: "+str(reward_delta), str(reward_delta.shape))
-           print("--------------------------------------------------------------------------")
-           print("absolute reward: "+str(abs_reward), str(abs_reward.shape))
-           print("--------------------------------------------------------------------------")
-           print("greed index: "+str(greed_index), str(greed_index.shape))
-           print("--------------------------------------------------------------------------")
-           print("gathered: " + str(gathered[0]), str(gathered.shape))
 
            reward = self.agent.qi(batch['new_rewards'][1], batch['rewards'][1])
            assert reward in batch['new_rewards'][1]
+           syssy = np.random.rand(128, 1)
+           assert gathered.shape == syssy.shape
 
-           sess.close()
-
-   def test_train(self):
-       with U.single_threaded_session() as sess:
            self.agent.initialize(sess)
-           icl, ial, pcl, pal = self.agent.train()
+
+           epoch_index_actor_losses = []
+           epoch_index_critic_losses = []
+           epoch_param_actor_losses = []
+           epoch_param_critic_losses = []
+           epoch_adaptive_distances = []
+           for t_train in range(1):
+               # Adapt param noise, if necessary.
+               if self.memory.nb_entries >= self.batch_size:
+                   distance = self.agent.adapt_param_noise()
+                   epoch_adaptive_distances.append(distance)
+               icl, ial, pcl, pal = self.agent.train()
+               epoch_index_actor_losses.append(icl)
+               epoch_index_critic_losses.append(ial)
+               epoch_param_actor_losses.append(pcl)
+               epoch_param_critic_losses.append(pal)
+               self.agent.update_target_net()

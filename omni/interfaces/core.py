@@ -68,4 +68,8 @@ def average_profit_over_time_seperate():
 def get_nonce():
     return time.time() * 1000
 
-
+def switch(discrete, continuous):
+    if discrete is not None:
+        return discrete
+    else:
+        return continuous

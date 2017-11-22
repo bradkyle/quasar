@@ -2,6 +2,14 @@ from omni.error import NoEntryPointError
 from gym import error
 import pkg_resources
 from heapq import nsmallest
+from enum import Enum
+
+class STAGE(Enum):
+    DEVELOPMENT = 1
+    TRAINING = 2
+    EVALUATION = 3
+
+
 
 def load(name):
     entry_point = pkg_resources.EntryPoint.parse('x={}'.format(name))

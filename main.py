@@ -1,5 +1,5 @@
 import os
-
+import numpy as np
 import time
 import baselines.common.tf_util as U
 from agents.tscl_agent.run import Worker
@@ -8,6 +8,7 @@ import threading
 import argparse
 from  agents.common.misc_util import boolean_flag
 
+np.set_printoptions(threshold='nan')
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 boolean_flag(parser, 'render-eval', default=False)
@@ -27,8 +28,8 @@ parser.add_argument('--gamma', type=float, default=0.99)
 parser.add_argument('--reward-scale', type=float, default=1.)
 parser.add_argument('--clip-norm', type=float, default=None)
 parser.add_argument('--nb-epochs', type=int, default=500)  # with default settings, perform 1M steps total
-parser.add_argument('--nb-epoch-cycles', type=int, default=20)
-parser.add_argument('--nb-train-steps', type=int, default=50)  # per epoch cycle and MPI worker
+parser.add_argument('--nb-epoch-cycles', type=int, default=1)
+parser.add_argument('--nb-train-steps', type=int, default=1)  # per epoch cycle and MPI worker
 parser.add_argument('--nb-rollout-steps', type=int, default=1)  # per epoch cycle and MPI worker
 parser.add_argument('--noise-type', type=str, default='adaptive-param_0.2')  # choices are adaptive-param_xx, ou_xx, normal_xx, none
 boolean_flag(parser, 'evaluation', default=False)
@@ -48,7 +49,7 @@ if __name__ == '__main__':
         for i in range(num_workers):
             workers.append(Worker(id=i, layer_norm=True, noise_type='adaptive-param_0.2'))
 
-    with U.single_threaded_session() as sess:
+    with tf.Session() as sess:
         coord = tf.train.Coordinator()
 
         if args['load_model'] == True and os.path.exists(args['save_path']):

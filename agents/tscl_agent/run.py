@@ -14,9 +14,6 @@ from collections import deque
 import agents.common.tf_util as U
 from agents.tscl_agent.agent import Agent
 
-
-
-
 class Worker():
     def __init__(self,
                  id,
@@ -104,9 +101,10 @@ class Worker():
 
 
         assert (np.abs(self.env.param_action_space.low) == self.env.param_action_space.high).all()  # we assume symmetric actions.
-        max_param_action = self.env.param_action_space.high
-        logger.info('scaling actions by {} before executing in env'.format(max_param_action))
+        # max_param_action = self.env.param_action_space.high
+        # logger.info('scaling actions by {} before executing in env'.format(max_param_action))
         self.agent = Agent(
+
                      env = self.env,
                      shared = self.shared,
                      index_actor = self.index_actor,
@@ -137,6 +135,8 @@ class Worker():
         #logger.info(str(self.agent.__dict__.items()))
 
     def work(self, nb_epochs, nb_epoch_cycles, nb_rollout_steps, nb_train_steps, coord, sess):
+
+
 
         step = 0
         episode = 0
@@ -186,6 +186,7 @@ class Worker():
                         action = [index, list((np.asarray(param_action) + 1)/2)]
 
                         # Execute step in environment
+                        print("stepping")
                         new_obs, new_rewards, done, info = self.env.step(action)
 
                         step += 1
@@ -215,6 +216,8 @@ class Worker():
                             obs = self.env.reset()
                             rewards = self.env.reward_space.sample()
 
+                        print("done")
+
                     # Train.
                     epoch_index_actor_losses = []
                     epoch_index_critic_losses = []
@@ -232,19 +235,19 @@ class Worker():
                         epoch_param_actor_losses.append(pcl)
                         epoch_param_critic_losses.append(pal)
                         self.agent.update_target_net()
-
-
-
+                    
+                    print("trained")
+                    
                     epoch_train_duration = time.time() - epoch_start_time
                     duration = time.time() - start_time
                     stats = self.agent.get_stats()
                     combined_stats = {}
                     for key in sorted(stats.keys()):
                         combined_stats[key] = mpi_mean(stats[key])
-
+                    
                     # Time related
                     combined_stats['duration/epoch'] = epoch_train_duration
-
+                    
                     # Rollout statistics.
                     combined_stats['rollout/return'] = mpi_mean(epoch_episode_rewards)
                     combined_stats['rollout/return_history'] = mpi_mean(np.mean(episode_rewards_history))
@@ -253,48 +256,48 @@ class Worker():
                     combined_stats['rollout/actions_mean'] = mpi_mean(epoch_actions)
                     combined_stats['rollout/actions_std'] = mpi_std(epoch_actions)
                     combined_stats['rollout/Q_mean'] = mpi_mean(epoch_qs)
-
+                    
                     # Train statistics.
                     combined_stats['train/loss_index_actor'] = mpi_mean(epoch_index_actor_losses)
                     combined_stats['train/loss_index_critic'] = mpi_mean(epoch_index_critic_losses)
                     combined_stats['train/loss_param_actor'] = mpi_mean(epoch_param_actor_losses)
                     combined_stats['train/loss_param_critic'] = mpi_mean(epoch_param_critic_losses)
                     combined_stats['train/param_noise_distance'] = mpi_mean(epoch_adaptive_distances)
-
+                    
                     # Total statistics.
                     combined_stats['total/duration'] = mpi_mean(duration)
                     combined_stats['total/steps_per_second'] = mpi_mean(float(t) / float(duration))
                     combined_stats['total/episodes'] = mpi_mean(episodes)
                     combined_stats['total/epochs'] = epoch + 1
                     combined_stats['total/steps'] = step
-
+                    
                     # Env Statistics
                     combined_stats['projected_return/current_balance/day'] = NotImplemented
                     combined_stats['projected_return/current_balance/week'] = NotImplemented
                     combined_stats['projected_return/current_balance/month'] = NotImplemented
                     combined_stats['projected_return/current_balance/year'] = NotImplemented
-
+                    
                     combined_stats['projected_return/100_dollars/day'] = NotImplemented
                     combined_stats['projected_return/100_dollars/week'] = NotImplemented
                     combined_stats['projected_return/100_dollars/month'] = NotImplemented
                     combined_stats['projected_return/100_dollars/year'] = NotImplemented
-
+                    
                     combined_stats['projected_return/1000_dollars/day'] = NotImplemented
                     combined_stats['projected_return/1000_dollars/week'] = NotImplemented
                     combined_stats['projected_return/1000_dollars/month'] = NotImplemented
                     combined_stats['projected_return/1000_dollars/year'] = NotImplemented
-
+                    
                     combined_stats['projected_return/10000_dollars/day'] = NotImplemented
                     combined_stats['projected_return/10000_dollars/week'] = NotImplemented
                     combined_stats['projected_return/10000_dollars/month'] = NotImplemented
                     combined_stats['projected_return/10000_dollars/year'] = NotImplemented
-
+                    
                     combined_stats['profit/time'] = NotImplemented
                     combined_stats['profit/step'] = NotImplemented
                     combined_stats['profit/expenditure'] = NotImplemented
-
+                    
                     combined_stats['account/balances'] = NotImplemented
-
+                    
                     for key in sorted(combined_stats.keys()):
                         logger.record_tabular(key, combined_stats[key])
                     logger.dump_tabular()
@@ -304,12 +307,12 @@ class Worker():
                         if hasattr(self.env, 'get_state'):
                             with open(os.path.join(logdir, 'env_state.pkl'), 'wb') as f:
                                 pickle.dump(self.env.get_state(), f)
-
+                    
                     if self.rank == 0:
                         saver = tf.train.Saver()
                         save_path = saver.save(sess, self.save_path)
                         print("Model saved in : %s" % save_path)
-
+                    
                     #todo randomizer randomize normal env
 
         def train():

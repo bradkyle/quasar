@@ -1,6 +1,7 @@
 from omni.interfaces.invoke import invoke
 from omni.interfaces.processing import process
-from omni.interfaces.core import get_nonce
+from omni.interfaces.core import get_nonce, switch
+from omni.interfaces.config import MAX_ORDER_SIZE, MAX_ORDER_PRICE
 import base64
 import hashlib
 import hmac
@@ -195,8 +196,8 @@ def get_past_trades(input):
         'request': API_VERSION + endpoint,
         'symbol': input.symbol,
         'nonce': get_nonce(),
-        'limit_trades': limit_trades,
-        'timestamp': timestamp
+        'limit_trades': input.limit_trades,
+        'timestamp': input.timestamp
     }
 
     return _invoke_api(endpoint, payload, keys=input.key_set, pub=False)
@@ -210,8 +211,8 @@ def get_past_trades(input):
 def new_order(input):
 
     client_order_id = str(_get_next_order_id())
-    price = round((input.args[0] * float(1e4)), 2) # todo make more dynamic
-    amount = round((input.args[1] * 1000.00), 2) # todo make more dynamic
+    price = switch(input.price, round((input.args[0] * float(MAX_ORDER_PRICE)), 2))
+    amount = switch(input.amount, round((input.args[1] * MAX_ORDER_SIZE), 2))
     endpoint = '/order/new'
 
     payload = {

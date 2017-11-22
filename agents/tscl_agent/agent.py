@@ -87,153 +87,155 @@ class Agent():
                  index_critic_l2_reg=0.
                  ):
 
-        self.env = env
+            self.env = env
 
-        # Placeholders
-        self.obs0 = tf.placeholder(tf.float32, shape=(None,) + self.env.observation_space.shape, name='obs0')
-        self.obs1 = tf.placeholder(tf.float32, shape=(None,) + self.env.observation_space.shape, name='obs1')
-        self.terminals1 = tf.placeholder(tf.float32, shape=(None, 1), name='terminals1')
-        self.step = tf.placeholder(tf.float32, shape=(None, 1), name='step')
-        self.reward = tf.placeholder(tf.float32, shape=(None, 1), name='reward')
-        self.rewards0 = tf.placeholder(tf.float32, shape=(None,) + rewards_shape, name='reward0')
-        self.rewards1 = tf.placeholder(tf.float32, shape=(None,) + rewards_shape, name='reward1')
-        self.candidate_actions = tf.placeholder(tf.float32, shape=(None, candidates_shape), name='candidate_actions')
-        self.param_actions = tf.placeholder(tf.float32, shape=(None,) + param_action_shape, name='actions')
-        self.index_critic_target = tf.placeholder(tf.float32, shape=(None, 1), name='index_critic_target')
-        self.param_critic_target = tf.placeholder(tf.float32, shape=(None, 1), name='param_critic_target')
-        self.param_noise_stddev = tf.placeholder(tf.float32, shape=(), name='param_noise_stddev')
+            # Placeholders
+            self.obs0 = tf.placeholder(tf.float32, shape=(None,) + self.env.observation_space.shape, name='obs0')
+            self.obs1 = tf.placeholder(tf.float32, shape=(None,) + self.env.observation_space.shape, name='obs1')
+            self.terminals1 = tf.placeholder(tf.float32, shape=(None, 1), name='terminals1')
+            self.step = tf.placeholder(tf.float32, shape=(None, 1), name='step')
+            self.reward = tf.placeholder(tf.float32, shape=(None, 1), name='reward')
+            self.rewards0 = tf.placeholder(tf.float32, shape=(None,) + rewards_shape, name='reward0')
+            self.rewards1 = tf.placeholder(tf.float32, shape=(None,) + rewards_shape, name='reward1')
+            self.candidate_actions = tf.placeholder(tf.float32, shape=(None, candidates_shape), name='candidate_actions')
+            self.param_actions = tf.placeholder(tf.float32, shape=(None,) + param_action_shape, name='actions')
+            self.index_critic_target = tf.placeholder(tf.float32, shape=(None, candidates_shape), name='index_critic_target')
+            self.param_critic_target = tf.placeholder(tf.float32, shape=(None, 1), name='param_critic_target')
+            self.param_noise_stddev = tf.placeholder(tf.float32, shape=(), name='param_noise_stddev')
 
-        # Parameters.
-        self.gamma = gamma
-        self.tau = tau
-        self.memory = memory
-        self.normalize_observations = normalize_observations
-        self.normalize_returns = normalize_returns
-        self.action_noise = action_noise
-        self.param_noise = param_noise
-        self.action_range = action_range
-        self.return_range = return_range
-        self.observation_range = observation_range
-        self.rewards_scale = reward_scale
-        self.index_critic = index_critic
-        self.index_actor = index_actor
-        self.index_actor_lr = index_actor_lr
-        self.index_critic_lr = index_critic_lr
-        self.param_critic = param_critic
-        self.param_actor = param_actor
-        self.param_actor_lr = param_actor_lr
-        self.param_critic_lr = param_critic_lr
-        self.clip_norm = clip_norm
-        self.enable_popart = enable_popart
-        self.batch_size = batch_size
-        self.stats_sample = None
-        self.param_critic_l2_reg = param_critic_l2_reg
-        self.index_critic_l2_reg = index_critic_l2_reg
+            # Parameters.
+            self.gamma = gamma
+            self.tau = tau
+            self.memory = memory
+            self.normalize_observations = normalize_observations
+            self.normalize_returns = normalize_returns
+            self.action_noise = action_noise
+            self.param_noise = param_noise
+            self.action_range = action_range
+            self.return_range = return_range
+            self.observation_range = observation_range
+            self.rewards_scale = reward_scale
+            self.clip_norm = clip_norm
+            self.enable_popart = enable_popart
+            self.batch_size = batch_size
+            self.stats_sample = None
 
-        # Observation Normalization
-        # ------------------------------------------------------------------------------------------------------------->
+            self.index_critic = index_critic
+            self.index_actor = index_actor
+            self.index_actor_lr = index_actor_lr
+            self.index_critic_lr = index_critic_lr
+            self.param_critic = param_critic
+            self.param_actor = param_actor
+            self.param_actor_lr = param_actor_lr
+            self.param_critic_lr = param_critic_lr
+            self.param_critic_l2_reg = param_critic_l2_reg
+            self.index_critic_l2_reg = index_critic_l2_reg
 
-        if self.normalize_observations:
-            with tf.variable_scope('obs_rms'):
-                self.obs_rms = RunningMeanStd(shape=self.env.observation_space.shape)
-        else:
-            self.obs_rms = None
+            # Observation Normalization
+            # ------------------------------------------------------------------------------------------------------------->
 
-        normalized_obs0 = tf.clip_by_value(normalize(self.obs0, self.obs_rms),
-                                           self.observation_range[0], self.observation_range[1])
-        normalized_obs1 = tf.clip_by_value(normalize(self.obs1, self.obs_rms),
-                                           self.observation_range[0], self.observation_range[1])
+            if self.normalize_observations:
+                with tf.variable_scope('obs_rms'):
+                    self.obs_rms = RunningMeanStd(shape=self.env.observation_space.shape)
+            else:
+                self.obs_rms = None
 
-        # Return normalization.
-        if self.normalize_returns:
-            with tf.variable_scope('ret_rms'):
-                self.ret_rms = RunningMeanStd()
-        else:
-            self.ret_rms = None
+            normalized_obs0 = tf.clip_by_value(normalize(self.obs0, self.obs_rms),
+                                               self.observation_range[0], self.observation_range[1])
+            normalized_obs1 = tf.clip_by_value(normalize(self.obs1, self.obs_rms),
+                                               self.observation_range[0], self.observation_range[1])
 
-
-        # Target Models
-        # ------------------------------------------------------------------------------------------------------------->
-
-        # Create target index actor.
-        target_index_actor = copy(index_actor)
-        target_index_actor.name = 'target_index_actor'
-        self.target_index_actor = target_index_actor
-
-        # Create target index critic.
-        target_index_critic = copy(index_critic)
-        target_index_critic.name = 'target_index_critic'
-        self.target_index_critic = target_index_critic
-
-        # Create target param critic.
-        target_param_critic = copy(param_critic)
-        target_param_critic.name = 'target_param_critic'
-        self.target_param_critic = target_param_critic
-
-        # Create target param actor.
-        target_param_actor = copy(param_actor)
-        target_param_actor.name = 'target_param_actor'
-        self.target_param_actor = target_param_actor
-
-        target_shared = copy(shared)
-        target_shared.name = 'target_shared'
-        self.target_shared = target_shared
-
-        # Models
-        # ------------------------------------------------------------------------------------------------------------->
-
-        # Shared layers
-        self.shared_tf = shared(normalized_obs0)
-
-        # Index action path
-        self.index_actor_tf = index_actor(self.shared_tf)
-
-        self.normalized_index_critic_tf = index_critic(normalized_obs0, self.candidate_actions)
-        self.index_critic_tf = denormalize(tf.clip_by_value(self.normalized_index_critic_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
-
-        # Param action path
-        self.param_actor_tf = param_actor(self.shared_tf)
-
-        self.normalized_param_critic_tf = param_critic(normalized_obs0, self.param_actions)
-        self.param_critic_tf = denormalize(tf.clip_by_value(self.normalized_param_critic_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
-
-        self.normalized_critic_with_actor_tf = param_critic(normalized_obs0, self.param_actor_tf, reuse=True)
-        self.param_critic_with_actor_tf = denormalize(tf.clip_by_value(self.normalized_critic_with_actor_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
+            # Return normalization.
+            if self.normalize_returns:
+                with tf.variable_scope('ret_rms'):
+                    self.ret_rms = RunningMeanStd()
+            else:
+                self.ret_rms = None
 
 
-        # Target Models
-        # ------------------------------------------------------------------------------------------------------------->
+            # Target Models
+            # ------------------------------------------------------------------------------------------------------------->
 
-        self.reward_delta = tf.subtract(self.rewards1, self.rewards0, name="reward_delta")
-        self.abs_reward = tf.abs(self.reward_delta)
-        self.greed_index = tf.argmax(self.abs_reward , axis=1)
-        self.gathered = tf.gather(self.rewards1, self.greed_index, axis=1)
+            # Create target index actor.
+            target_index_actor = copy(index_actor)
+            target_index_actor.name = 'target_index_actor'
+            self.target_index_actor = target_index_actor
 
-        self.target_shared_tf = target_shared(normalized_obs1)
-        self.target_index_actor_tf = target_index_actor(self.target_shared_tf)
+            # Create target index critic.
+            target_index_critic = copy(index_critic)
+            target_index_critic.name = 'target_index_critic'
+            self.target_index_critic = target_index_critic
 
-        Q_param_obs1 = denormalize(target_param_critic(normalized_obs1, target_param_actor(self.target_shared_tf)), self.ret_rms)
-        self.target_param_Q = self.gathered + (1. - self.terminals1) * gamma * Q_param_obs1 # self.qi(self.rewards1, self.rewards0)
+            # Create target param critic.
+            target_param_critic = copy(param_critic)
+            target_param_critic.name = 'target_param_critic'
+            self.target_param_critic = target_param_critic
 
-        Q_index_obs1 = denormalize(target_index_critic(normalized_obs1, self.candidate_actions), self.ret_rms)
-        self.target_index_Q = self.gathered + (1. - self.terminals1) * gamma * Q_index_obs1
+            # Create target param actor.
+            target_param_actor = copy(param_actor)
+            target_param_actor.name = 'target_param_actor'
+            self.target_param_actor = target_param_actor
 
-        # Set up parts
-        # ------------------------------------------------------------------------------------------------------------->
+            target_shared = copy(shared)
+            target_shared.name = 'target_shared'
+            self.target_shared = target_shared
 
-        if self.param_noise is not None:
-            self.setup_param_noise(normalized_obs0)
-        self.setup_optimizers()
-        if self.normalize_returns and self.enable_popart:
-            self.setup_popart()
+            # Models
+            # ------------------------------------------------------------------------------------------------------------->
 
-        self.setup_stats()
-        self.setup_target_network_updates()
+            # Shared layers
+            self.shared_tf = shared(normalized_obs0)
+
+            # Index action path
+            self.index_actor_tf = index_actor(self.shared_tf)
+
+            self.normalized_index_critic_tf = index_critic(normalized_obs0, self.candidate_actions)
+            self.index_critic_tf = denormalize(tf.clip_by_value(self.normalized_index_critic_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
+
+            # Param action path
+            self.param_actor_tf = param_actor(self.shared_tf)
+
+            self.normalized_param_critic_tf = param_critic(normalized_obs0, self.param_actions)
+            self.param_critic_tf = denormalize(tf.clip_by_value(self.normalized_param_critic_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
+
+            self.normalized_critic_with_actor_tf = param_critic(normalized_obs0, self.param_actor_tf, reuse=True)
+            self.param_critic_with_actor_tf = denormalize(tf.clip_by_value(self.normalized_critic_with_actor_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
+
+
+            # Target Models
+            # ------------------------------------------------------------------------------------------------------------->
+
+            self.reward_delta = tf.subtract(self.rewards1, self.rewards0, name="reward_delta")
+            self.abs_reward = tf.abs(self.reward_delta)
+            self.greed_index = tf.argmax(self.abs_reward , axis=1)
+            self.gathered = tf.reshape(tf.gather(self.rewards1, self.greed_index, axis=1)[0], shape=(128, 1))
+
+            self.target_shared_tf = target_shared(normalized_obs1)
+            self.target_index_actor_tf = target_index_actor(self.target_shared_tf)
+
+            Q_param_obs1 = denormalize(target_param_critic(normalized_obs1, target_param_actor(self.target_shared_tf)), self.ret_rms)
+            self.target_param_Q = self.gathered + (1. - self.terminals1) * gamma * Q_param_obs1 # self.qi(self.rewards1, self.rewards0)
+
+            Q_index_obs1 = denormalize(target_index_critic(normalized_obs1, self.candidate_actions), self.ret_rms)
+            self.target_index_Q = self.gathered + (1. - self.terminals1) * gamma * Q_index_obs1
+
+            # Set up parts
+            # ------------------------------------------------------------------------------------------------------------->
+
+            if self.param_noise is not None:
+                self.setup_param_noise(normalized_obs0)
+            self.setup_optimizers()
+            if self.normalize_returns and self.enable_popart:
+                self.setup_popart()
+
+            self.setup_stats()
+            self.setup_target_network_updates()
 
 
     def initialize(self, sess):
         self.sess = sess
         self.sess.run(tf.global_variables_initializer())
+
         self.index_actor_optimizer.sync()
         self.index_critic_optimizer.sync()
         self.sess.run(self.target_index_init_updates)
@@ -441,12 +443,11 @@ class Agent():
 
     def store_transition(self, obs, new_obs, index_action, candidate_actions, param_action, rewards, new_rewards, done, step):
         self.memory.append(obs, new_obs, index_action, candidate_actions, param_action, rewards, new_rewards, done, step)
-        #if self.normalize_observations: #todo
-        #    self.obs_rms.update(np.array([obs0]))
+        # if self.normalize_observations:
+        #     self.obs_rms.update(np.array([obs]))
 
     def train(self):
         batch = self.memory.sample(batch_size=self.batch_size)
-
 
         if self.normalize_returns and self.enable_popart:
             old_mean, old_std, target_param_Q, target_index_Q = self.sess.run(
@@ -498,6 +499,7 @@ class Agent():
                     self.obs1: batch['new_obs'],
                     self.rewards0: batch['rewards'],
                     self.rewards1: batch['new_rewards'],
+                    self.reward: np.random.rand(128,1),
                     self.candidate_actions: batch['candidate_actions'],
                     self.terminals1: batch['terminals1'].astype('float32'),
                 }
@@ -535,8 +537,8 @@ class Agent():
         self.index_actor_optimizer.update(index_actor_grads, stepsize=self.index_actor_lr)
         self.index_critic_optimizer.update(index_critic_grads, stepsize=self.index_critic_lr)
 
-        self.param_actor_optimizer.update(index_actor_grads, stepsize=self.param_actor_lr)
-        self.param_critic_optimizer.update(index_critic_grads, stepsize=self.param_critic_lr)
+        self.param_actor_optimizer.update(param_actor_grads, stepsize=self.param_actor_lr)
+        self.param_critic_optimizer.update(param_critic_grads, stepsize=self.param_critic_lr)
 
         return index_critic_loss, index_actor_loss, param_critic_loss, param_actor_loss
 
